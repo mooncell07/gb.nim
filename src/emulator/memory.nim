@@ -51,7 +51,7 @@ proc runChecksum(self: ROM): void =
     else:
         raise newException(RomError, "Checksum Failed for the ROM.")
 
-proc createRom*(filepath: string): ROM =
+proc newRom*(filepath: string): ROM =
     let self = ROM(data: readFile(filepath))
     self.runChecksum()
     self.fillHeaders()

@@ -7,5 +7,5 @@ proc msb*(value: uint16): uint8 =
 proc concat*(lo: uint8, hi: uint16): uint16 =
     return (hi shl 8) or lo
 
-template isboundto*[T](value: T, lower: T, upper: T): bool =
-    (value >= lower) and (upper >= value)
+func isboundto*[T: SomeInteger](value: T, lower: T, upper: T): bool {.inline.} =
+    return (value >= lower) and (upper >= value)
