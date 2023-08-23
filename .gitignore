@@ -5,3 +5,4 @@ htmldocs/
 bin/
 logs.txt
 *.gb
+restricted.txt

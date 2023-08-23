@@ -4,7 +4,7 @@ import timer
 
 type
     Bus* = ref object
-        rom: ROM
+        rom*: ROM
 
 #TODO: Add support for External RAM, OAM, IO and IE.
 

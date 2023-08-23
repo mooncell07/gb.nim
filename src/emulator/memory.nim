@@ -19,7 +19,7 @@ type
         destinationCode: uint8
         checksum: uint8
 
-    RomError = object of ValueError
+    RomError* = object of ValueError
 
 proc read*(self: ROM, address: uint16): uint8 =
     return self.data[address].uint8

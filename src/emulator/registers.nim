@@ -9,7 +9,10 @@ var sp*: uint16
 var f*: uint8
 
 template getReg*[R: R8](r: R): uint8 =
-    r8[ord(r)]
+    when r == aHL:
+        bus.readByte(getReg(HL))
+    else:
+        r8[ord(r)]
 
 template getReg*[RP: R16](r: RP): uint16 =
     var value: uint16
@@ -23,7 +26,10 @@ template getReg*[RP: R16](r: RP): uint16 =
     value
 
 template setReg*[N: uint8](r: R8, n: N): void =
-    r8[ord(r)] = n
+    when r == aHL:
+        bus.writeByte(getReg(HL), n)
+    else:
+        r8[ord(r)] = n
 
 template setReg*[N: uint16](r: R16, n: N): void =
     when r == BC:
@@ -62,3 +68,18 @@ template `writeC=`*(f: var uint8, value: bool): void =
 
 template getFlag*(v: flags): bool =
     f.testBit(ord(v))
+
+proc resetRegState*(): void {.inline.} =
+    setReg(A, 0x01)
+    setReg(B, 0x00)
+    setReg(C, 0x13)
+    setReg(D, 0x00)
+    setReg(E, 0xD8)
+    setReg(H, 0x01)
+    setReg(L, 0x4D)
+
+    f.writeC = true; f.writeH = true; f.writeZ = true
+    f.writeN = false
+
+    setReg(SP, 0xFFFE)
+    pc = 0x0100
