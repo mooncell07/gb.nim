@@ -1,13 +1,13 @@
 import bitops
 
-template lsb*(value: uint16): uint8 = (value and 0xFF).uint8
-template msb*(value: uint16): uint8 = (value shr 8).uint8
-template concat*(lo: uint8, hi: uint16): uint16 = (hi shl 8) or lo
-template x*(opcode: uint8): uint8 = opcode.bitsliced(6..7)
-template y*(opcode: uint8): uint8 = opcode.bitsliced(3..5)
-template z*(opcode: uint8): uint8 = opcode.bitsliced(0..2)
-template p*(opcode: uint8): uint8 = opcode.bitsliced(4..5)
-template q*(opcode: uint8): uint8 = opcode.testbit(3).uint8
+func lsb*(value: uint16): uint8 {.inline.} = (value and 0xFF).uint8
+func msb*(value: uint16): uint8 {.inline.} = (value shr 8).uint8
+func concat*(lo: uint8, hi: uint16): uint16 {.inline.} = (hi shl 8) or lo
+func x*(opcode: uint8): uint8 {.inline.} = opcode.bitsliced(6..7)
+func y*(opcode: uint8): uint8 {.inline.} = opcode.bitsliced(3..5)
+func z*(opcode: uint8): uint8 {.inline.} = opcode.bitsliced(0..2)
+func p*(opcode: uint8): uint8 {.inline.} = opcode.bitsliced(4..5)
+func q*(opcode: uint8): uint8 {.inline.} = opcode.testbit(3).uint8
 
-template isboundto*[T: SomeInteger](value: T, lower: T,
-    upper: T): bool = (value >= lower) and (upper >= value)
+func isboundto*[T: SomeInteger](value: T, lower: T,
+    upper: T): bool {.inline.} = (value >= lower) and (upper >= value)

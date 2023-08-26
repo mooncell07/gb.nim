@@ -30,13 +30,9 @@ proc writeByte*(self: Bus, address: uint16, data: uint8): void =
     elif address.isboundto(0xFF80, 0xFFFE):
         hram[address - 0xFF80'u16] = data
 
-proc readWord*(self: Bus, address: uint16): uint16 =
-    let
-        lo = self.readByte(address)
-        hi = self.readByte(address + 1)
-
-    return concat(lo, hi)
-
 proc writeWord*(self: Bus, address: uint16, data: uint16): void =
     self.writeByte(address, data.lsb)
     self.writeByte(address + 1, data.msb)
+
+proc internal*(self: Bus): void =
+    incCycle(1)
