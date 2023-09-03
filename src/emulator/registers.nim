@@ -3,79 +3,75 @@ import bus as memBus
 import types
 import utils
 
-var r8: array[0..7, uint8]
+var r8: array[R8Type, uint8]
 var pc*: uint16
 var sp*: uint16
 var f*: uint8
 
 var bus: Bus
 
-proc getReg*(r: R16): uint16 =
+proc getReg*(r: R16Type): uint16 =
     case r
     of BC:
-        concat(hi = r8[ord(B)], lo = r8[ord(C)])
+        concat(hi = r8[B], lo = r8[C])
     of DE:
-        concat(hi = r8[ord(D)], lo = r8[ord(E)])
+        concat(hi = r8[D], lo = r8[E])
     of HL:
-        concat(hi = r8[ord(H)], lo = r8[ord(L)])
+        concat(hi = r8[H], lo = r8[L])
     of SP:
         sp
     of AF:
-        concat(hi = r8[ord(A)], lo = f)
+        concat(hi = r8[A], lo = f)
 
-proc getReg*(r: R8): uint8 =
+proc getReg*(r: R8Type): uint8 {.inline.} =
     if r == aHL:
-        bus.readByte(getReg(HL))
-    else:
-        r8[ord(r)]
+        return bus.readByte(getReg(HL))
+    return r8[r]
 
-proc setReg*(r: R8, n: uint8): void =
+proc setReg*(r: R8Type, n: uint8): void {.inline.} =
     if r == aHL:
         bus.writeByte(getReg(HL), n)
     else:
-        r8[ord(r)] = n
+        r8[r] = n
 
-proc setReg*(r: R16, n: uint16): void =
+proc setReg*(r: R16Type, n: uint16): void =
     case r
     of BC:
-        r8[ord(B)] = msb(n)
-        r8[ord(C)] = lsb(n)
-
+        r8[B] = msb(n); r8[C] = lsb(n)
     of DE:
-        r8[ord(D)] = msb(n)
-        r8[ord(E)] = lsb(n)
-
+        r8[D] = msb(n); r8[E] = lsb(n)
     of HL:
-        r8[ord(H)] = msb(n)
-        r8[ord(L)] = lsb(n)
-
+        r8[H] = msb(n); r8[L] = lsb(n)
     of SP:
         sp = n
-
     of AF:
-        r8[ord(A)] = msb(n)
-        f = lsb(n)
+        r8[A] = msb(n); f = lsb(n)
 
-proc `writeZ=`*(f: var uint8, value: bool): void =
-    if value == false: f.clearBit(ord(ftZ))
-    else: f.setBit(ord(ftZ))
 
-proc `writeN=`*(f: var uint8, value: bool): void =
-    if value == false: f.clearBit(ord(ftN))
-    else: f.setBit(ord(ftN))
+proc getFlag*(ft: FlagType): bool {.inline.} =
+    return f.testBit(ord(ft))
 
-proc `writeH=`*(f: var uint8, value: bool): void =
-    if value == false: f.clearBit(ord(ftH))
-    else: f.setBit(ord(ftH))
+proc setFlag(f: var uint8, ft: FlagType, v: bool): void {.inline.} =
+    if v:
+        f.setBit(ord(ft))
+    else:
+        f.clearBit(ord(ft))
 
-proc `writeC=`*(f: var uint8, value: bool): void =
-    if value == false: f.clearBit(ord(ftC))
-    else: f.setBit(ord(ftC))
 
-template getFlag*(v: flags): bool =
-    f.testBit(ord(v))
+proc `Z=`*(f: var uint8, value: bool): void =
+    setFlag(f, ftZ, value)
 
-proc getCC*(cc: CC): bool {.inline.} =
+proc `N=`*(f: var uint8, value: bool): void =
+    setFlag(f, ftZ, value)
+
+proc `H=`*(f: var uint8, value: bool): void =
+    setFlag(f, ftH, value)
+
+proc `C=`*(f: var uint8, value: bool): void =
+    setFlag(f, ftC, value)
+
+
+proc getCC*(cc: CCType): bool {.inline.} =
     case cc
     of ccNZ:
         not getFlag(ftZ)
@@ -86,6 +82,7 @@ proc getCC*(cc: CC): bool {.inline.} =
     of ccC:
         getFlag(ftC)
 
+
 proc resetRegState*(mbus: var Bus): void {.inline.} =
     setReg(A, 0x01)
     setReg(B, 0x00)
@@ -95,8 +92,8 @@ proc resetRegState*(mbus: var Bus): void {.inline.} =
     setReg(H, 0x01)
     setReg(L, 0x4D)
 
-    f.writeC = true; f.writeH = true; f.writeZ = true
-    f.writeN = false
+    f.C = true; f.H = true; f.Z = true
+    f.N = false
 
     setReg(SP, 0xFFFE)
     pc = 0x0100

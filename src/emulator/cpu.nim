@@ -5,7 +5,6 @@ import memory
 import registers
 import utils
 import types
-import options
 
 var bus*: Bus
 var currOp*: uint8
@@ -25,18 +24,8 @@ proc fetch*(): uint8 {.inline.} =
     inc pc
 
 proc fetchWord*(): uint16 {.inline.} =
-    let lo = fetch()
-    let hi = fetch()
+    let 
+        lo = fetch()
+        hi = fetch()
 
     return concat(lo, hi)
-
-proc opJR(code = none(uint8)): void =
-    let i8 = cast[int8](fetch()).uint16
-    if code.isNone or getCC(CC(get(code))):
-        pc += i8
-        bus.internal()
-
-proc opJP(code = none(uint8)): void =
-    let u8 = fetchWord()
-    pc = u8
-    bus.internal()
