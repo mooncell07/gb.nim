@@ -9,6 +9,7 @@ import strutils
 
 var bus*: Bus
 var currOp*: uint8
+var ime*: bool
 
 
 proc newCpu*(): void =
@@ -25,7 +26,7 @@ proc fetch*(): uint8 {.inline.} =
     inc pc
 
 proc fetchWord*(): uint16 {.inline.} =
-    let 
+    let
         lo = fetch()
         hi = fetch()
 
@@ -47,3 +48,31 @@ proc opLDr_addr(reg: R8Type, address: uint16): void =
 
 proc opLDaddr_r(address: uint16, reg: R8Type): void =
     bus.writeByte(address, getReg(reg))
+
+proc opINC(reg: R8Type | R16Type): void =
+    let
+        value = getReg(reg)
+        res = value + 1
+
+    when reg is R8Type:
+        f.Z = not res.bool
+        f.N = false
+        f.H = checkHalfCarry(value, 1)
+
+    setReg(reg, res)
+
+proc opDEC(reg: R8Type | R16Type): void =
+    let
+        value = getReg(reg)
+        res = value - 1
+
+    when reg is R8Type:
+        f.Z = not res.bool
+        f.N = true
+        f.H = checkHalfBorrow(value)
+
+    setReg(reg, res)
+
+proc opJR(offset: uint16): void =
+    pc += offset
+    bus.internal()
