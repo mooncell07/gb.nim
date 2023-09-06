@@ -62,7 +62,7 @@ proc `Z=`*(f: var uint8, value: bool): void =
     setFlag(f, ftZ, value)
 
 proc `N=`*(f: var uint8, value: bool): void =
-    setFlag(f, ftZ, value)
+    setFlag(f, ftN, value)
 
 proc `H=`*(f: var uint8, value: bool): void =
     setFlag(f, ftH, value)

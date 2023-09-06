@@ -5,6 +5,7 @@ import memory
 import registers
 import utils
 import types
+import strutils
 
 var bus*: Bus
 var currOp*: uint8
@@ -29,3 +30,20 @@ proc fetchWord*(): uint16 {.inline.} =
         hi = fetch()
 
     return concat(lo, hi)
+
+proc opJP(): void =
+    pc = fetchWord()
+    bus.internal()
+
+proc opLDr_r(src: R8Type, dest: R8Type): void =
+    setReg(src, getReg(dest))
+
+proc opLDr_n(reg: R8Type | R16Type): void =
+    when reg is R8Type: setReg(reg, fetch())
+    else: setReg(reg, fetchWord())
+
+proc opLDr_addr(reg: R8Type, address: uint16): void =
+    setReg(reg, bus.readByte(address))
+
+proc opLDaddr_r(address: uint16, reg: R8Type): void =
+    bus.writeByte(address, getReg(reg))
