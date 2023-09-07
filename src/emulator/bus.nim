@@ -17,6 +17,9 @@ proc readByte*(self: Bus, address: uint16, incr = true): uint8 =
 
     elif address.isboundto(0xFF80, 0xFFFE):
         result = hram[address - 0xFF80'u16]
+    
+    elif address.isboundto(0xFF00, 0xFF7F): #FIXME: impl. io regs
+        result = 0x90
 
     if incr:
         incCycle(1)
@@ -34,7 +37,7 @@ proc writeByte*(self: Bus, address: uint16, data: uint8, incr = true): void =
     if incr:
         incCycle(1)
 
-proc writeWord*(self: Bus, address: uint16, data: uint16): void =
+proc writeWord*(self: Bus, address, data: uint16): void =
     self.writeByte(address, data.lsb)
     self.writeByte(address + 1, data.msb)
 

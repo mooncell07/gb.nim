@@ -36,7 +36,7 @@ proc opJP(): void =
     pc = fetchWord()
     bus.internal()
 
-proc opLDr_r(src: R8Type, dest: R8Type): void =
+proc opLDr_r(src, dest: R8Type): void =
     setReg(src, getReg(dest))
 
 proc opLDr_n(reg: R8Type | R16Type): void =
@@ -69,7 +69,7 @@ proc opDEC(reg: R8Type | R16Type): void =
     when reg is R8Type:
         f.Z = not res.bool
         f.N = true
-        f.H = checkHalfBorrow(value)
+        f.H = checkHalfBorrow(value, 1)
 
     setReg(reg, res)
 
@@ -106,3 +106,47 @@ proc opCALL(address: uint16): void =
 proc opRET(address: uint16): void =
     pc = address
     bus.internal()
+
+proc alu(op: AluOp, data: uint8): void =
+    let acc = getReg(A)
+    var res: uint8
+
+    case op
+    of OR:
+        res = acc or data
+        f.N = false; f.H = false; f.C = false
+
+    of CP:
+        res = acc - data
+        f.N = true
+        f.H = checkHalfBorrow(acc, data)
+        f.C = data > acc
+
+    of AND:
+        res = acc and data
+        f.N = false; f.C = false
+        f.H = true
+
+    of XOR:
+        res = acc xor data
+        f.N = false; f.H = false; f.C = false
+
+    of ADD:
+        res = acc + data
+        f.N = false
+        f.H = checkHalfCarry(acc, data)
+        f.C = acc > data
+
+    of SUB:
+        res = acc - data
+        f.N = true
+        f.H = checkHalfBorrow(acc, data)
+        f.C = data > acc
+
+    else:
+        quit("OPCODE HANDLER NOT FOUND: " & currOp.toHex & " (" & $op & ")", 0)
+
+    f.Z = not res.bool
+
+    if op != CP:
+        setReg(A, res)
