@@ -76,3 +76,33 @@ proc opDEC(reg: R8Type | R16Type): void =
 proc opJR(offset: uint16): void =
     pc += offset
     bus.internal()
+
+proc opPUSH(reg: R16Type | uint16): void =
+    bus.internal()
+    var data: uint16
+
+    when reg is R16Type:
+        data = getReg(reg)
+    else:
+        data = reg
+
+    dec sp
+    bus.writeByte(sp, msb(data))
+    dec sp
+    bus.writeByte(sp, lsb(data))
+
+proc opPOP(reg: R16Type): void =
+    let lo = bus.readByte(sp)
+    inc sp
+    let hi = bus.readByte(sp)
+    inc sp
+
+    setReg(reg, concat(lo, hi))
+
+proc opCALL(address: uint16): void =
+    opPUSH(pc)
+    pc = address
+
+proc opRET(address: uint16): void =
+    pc = address
+    bus.internal()
