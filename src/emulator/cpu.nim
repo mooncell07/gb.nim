@@ -183,61 +183,71 @@ proc prefixHandler(): void =
     let 
         op = fetch()
         reg = R8Type(op.z)
+        u8 = getReg(reg)
+
+    var res: uint8
 
     case op.x
     of 0x0:
         let rot = PrefixOp(op.y)
         case rot
-        of SRL:
-            let 
-                u8 = getReg(reg)
-                res = u8 shr 1
-
+        of RL:
+            res = (u8 shl 1) or getFlag(ftC).uint8
             f.Z = res == 0
-            f.N = false; f.H = false
-            f.C = (u8 and 1).bool
+            f.C = (u8 shr 7) != 0
 
-            setReg(reg, res)
-        
         of RR:
-            let 
-                u8 = getReg(reg)
-                res = (u8 shr 1) or (getFlag(ftC).uint8 shl 7)
-
+            res = (u8 shr 1) or (getFlag(ftC).uint8 shl 7)
             f.Z = res == 0
-            f.N = false; f.H = false
-            f.C = (u8 and 1).bool
+            f.C = (u8 and 1) == 1
 
-            setReg(reg, res)
-        
-        else:
-            quit("CB OPCODE NOT FOUND: " & op.toHex, 0)
-        
+        of RLC:
+            f.C = (u8 shr 7) != 0
+            res = rotateLeftBits(u8, 1) or getFlag(ftC).uint8
+            f.Z = res == 0
+
+        of RRC:
+            f.C = (u8 and 1) == 1
+            res = rotateRightBits(u8, 1) or (0x80 and getFlag(ftC).uint8)
+            f.Z = res == 0
+
+        of SLA:
+            res = (u8 shl 1)
+            f.Z = res == 0
+            f.C = (u8 shr 7) != 0
+
+        of SRL:
+            res = u8 shr 1
+            f.Z = res == 0
+            f.C = (u8 and 1) == 1
+
+        of SRA:
+            res = (u8 shr 1) or (u8 and 0x80)
+            f.Z = res == 0
+            f.C = (u8 and 1) == 1
+
+        of SWAP:
+            res = rotateLeftBits(u8, 4)
+            f.Z = res == 0
+            f.C = false
+
     of 0x1:
-        let res = getReg(reg).testBit(op.y.uint8)
-        f.Z = not res
+        f.Z = not getReg(reg).testBit(op.y.uint8)
         f.N = false
         f.H = true
     
     of 0x2:
-        var data = getReg(reg)
-        data.clearBit(op.y.uint8)
-        setReg(reg, data)
-    
+        res = u8
+        res.clearBit(op.y.uint8)
+
     of 0x3:
-        var data = getReg(reg)
-        data.setBit(op.y.uint8)
-        setReg(reg, data)
+        res = u8
+        res.setBit(op.y.uint8)
 
-proc opRRA(): void =
-    let 
-        u8 = getReg(A)
-        res = (u8 shr 1) or (getFlag(ftC).uint8 shl 7)
-
-    f.Z = false; f.N = false; f.H = false
-    f.C = (u8 and 1).bool
-
-    setReg(A, res)
+    if op.x != 1:
+        setReg(reg, res)
+        if op.x == 0:
+            f.N = false; f.H = false;
 
 proc opADDHL_RP(reg: R16Type): void =
     let 
@@ -256,8 +266,7 @@ proc opADDSP_i8(multiInts=true): void =
         data = signed(fetch())
         res = sp + data
 
-    f.Z = false
-    f.N = false
+    f.Z = false; f.N = false
     f.H = (sp and 0xF) + (data and 0xF) > 0xF
     f.C = (sp and 0xFF) + (data and 0xFF) > 0xFF
 
@@ -266,3 +275,35 @@ proc opADDSP_i8(multiInts=true): void =
     if multiInts:
         bus.internal()
     sp = res
+
+proc opRLCA(): void =
+    let acc = getReg(A)
+    f.C = (acc shr 7) != 0
+    let data = rotateLeftBits(acc, 1) or getFlag(ftC).uint8
+    f.Z = false; f.N = false; f.H = false
+    setReg(A, data)
+
+proc opRLA(): void =
+    let 
+        acc = getReg(A)
+        data = (acc shl 1) or getFlag(ftC).uint8
+
+    f.C = (acc shr 7) != 0
+    f.Z = false; f.N = false; f.H = false
+    setReg(A, data)
+
+proc opRRA(): void =
+    let 
+        u8 = getReg(A)
+        res = (u8 shr 1) or (getFlag(ftC).uint8 shl 7)
+
+    f.Z = false; f.N = false; f.H = false
+    f.C = (u8 and 1) == 1
+    setReg(A, res)
+
+proc opRRCA(): void =
+    let acc = getReg(A)
+    f.C = (acc and 1) == 1
+    let data = rotateRightBits(acc, 1) or (0x80 and getFlag(ftC).uint8)
+    f.Z = false; f.N = false; f.H = false
+    setReg(A, data)
