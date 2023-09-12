@@ -3,6 +3,7 @@ import os
 import bus as memBus
 import memory
 import registers
+import bitops
 import utils
 import types
 import strutils
@@ -32,9 +33,18 @@ proc fetchWord*(): uint16 {.inline.} =
 
     return concat(lo, hi)
 
-proc opJP(): void =
-    pc = fetchWord()
-    bus.internal()
+proc RETUtil(): uint16 =
+    let lo = bus.readByte(sp)
+    inc sp
+    let hi = bus.readByte(sp)
+    inc sp
+
+    return concat(lo, hi)
+
+proc opJP(address: uint16, hl=false): void =
+    pc = address
+    if not hl:
+        bus.internal()
 
 proc opLDr_r(src, dest: R8Type): void =
     setReg(src, getReg(dest))
@@ -49,13 +59,22 @@ proc opLDr_addr(reg: R8Type, address: uint16): void =
 proc opLDaddr_r(address: uint16, reg: R8Type): void =
     bus.writeByte(address, getReg(reg))
 
+proc opLDaddr_SP(): void =
+    let nn = fetchWord()
+    bus.writeByte(nn, lsb(sp))
+    bus.writeByte(nn+1, msb(sp))
+
+proc opLDRP_word(reg: R16Type, data: uint16): void =
+    setReg(reg, data)
+    bus.internal()
+
 proc opINC(reg: R8Type | R16Type): void =
     let
         value = getReg(reg)
         res = value + 1
 
     when reg is R8Type:
-        f.Z = not res.bool
+        f.Z = res == 0
         f.N = false
         f.H = checkHalfCarry(value, 1)
 
@@ -67,7 +86,7 @@ proc opDEC(reg: R8Type | R16Type): void =
         res = value - 1
 
     when reg is R8Type:
-        f.Z = not res.bool
+        f.Z = res == 0
         f.N = true
         f.H = checkHalfBorrow(value, 1)
 
@@ -135,18 +154,115 @@ proc alu(op: AluOp, data: uint8): void =
         res = acc + data
         f.N = false
         f.H = checkHalfCarry(acc, data)
-        f.C = acc > data
+        f.C = acc > res
 
     of SUB:
         res = acc - data
         f.N = true
         f.H = checkHalfBorrow(acc, data)
         f.C = data > acc
+    
+    of ADC:
+        res = acc + data + getFlag(ftC).uint8
+        f.N = false
+        f.H = ((acc and 0xF) + (data and 0xF) + getFlag(ftC).uint8) > 0xF
+        f.C = (acc.uint16 + data.uint16 + getFlag(ftC).uint16) > 0xFF
+    
+    of SBC:
+        res = acc - getFlag(ftC).uint8 - data
+        f.N = true
+        f.H = ((data and 0xF) + getFlag(ftC).uint8) > (acc and 0xF)
+        f.C = (data.uint16 + getFlag(ftC).uint8) > acc
 
-    else:
-        quit("OPCODE HANDLER NOT FOUND: " & currOp.toHex & " (" & $op & ")", 0)
-
-    f.Z = not res.bool
+    f.Z = res == 0
 
     if op != CP:
         setReg(A, res)
+
+proc prefixHandler(): void =
+    let 
+        op = fetch()
+        reg = R8Type(op.z)
+
+    case op.x
+    of 0x0:
+        let rot = PrefixOp(op.y)
+        case rot
+        of SRL:
+            let 
+                u8 = getReg(reg)
+                res = u8 shr 1
+
+            f.Z = res == 0
+            f.N = false; f.H = false
+            f.C = (u8 and 1).bool
+
+            setReg(reg, res)
+        
+        of RR:
+            let 
+                u8 = getReg(reg)
+                res = (u8 shr 1) or (getFlag(ftC).uint8 shl 7)
+
+            f.Z = res == 0
+            f.N = false; f.H = false
+            f.C = (u8 and 1).bool
+
+            setReg(reg, res)
+        
+        else:
+            quit("CB OPCODE NOT FOUND: " & op.toHex, 0)
+        
+    of 0x1:
+        let res = getReg(reg).testBit(op.y.uint8)
+        f.Z = not res
+        f.N = false
+        f.H = true
+    
+    of 0x2:
+        var data = getReg(reg)
+        data.clearBit(op.y.uint8)
+        setReg(reg, data)
+    
+    of 0x3:
+        var data = getReg(reg)
+        data.setBit(op.y.uint8)
+        setReg(reg, data)
+
+proc opRRA(): void =
+    let 
+        u8 = getReg(A)
+        res = (u8 shr 1) or (getFlag(ftC).uint8 shl 7)
+
+    f.Z = false; f.N = false; f.H = false
+    f.C = (u8 and 1).bool
+
+    setReg(A, res)
+
+proc opADDHL_RP(reg: R16Type): void =
+    let 
+        hl = getReg(HL)
+        data = getReg(reg)
+
+    setReg(HL, hl + data)
+    f.N = false
+    f.H = (hl and 0xFFF) + (data and 0xFFF) > 0xFFF
+    f.C = (hl.uint32 + data.uint32) > 0xFFFF
+
+    bus.internal()
+
+proc opADDSP_i8(multiInts=true): void =
+    let 
+        data = signed(fetch())
+        res = sp + data
+
+    f.Z = false
+    f.N = false
+    f.H = (sp and 0xF) + (data and 0xF) > 0xF
+    f.C = (sp and 0xFF) + (data and 0xFF) > 0xFF
+
+    bus.internal()
+
+    if multiInts:
+        bus.internal()
+    sp = res

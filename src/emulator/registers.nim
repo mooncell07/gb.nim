@@ -45,7 +45,7 @@ proc setReg*(r: R16Type, n: uint16): void =
     of SP:
         sp = n
     of AF:
-        r8[A] = msb(n); f = lsb(n)
+        r8[A] = msb(n); f = (n and 0xFFF0'u16).uint8
 
 
 proc getFlag*(ft: FlagType): bool {.inline.} =
