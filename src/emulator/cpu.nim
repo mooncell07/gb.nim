@@ -11,7 +11,7 @@ import strutils
 var bus*: Bus
 var currOp*: uint8
 var ime*: bool
-
+var halted: bool = false
 
 proc newCpu*(): void =
     let args = commandLineParams()
@@ -307,3 +307,34 @@ proc opRRCA(): void =
     let data = rotateRightBits(acc, 1) or (0x80 and getFlag(ftC).uint8)
     f.Z = false; f.N = false; f.H = false
     setReg(A, data)
+
+proc opRETI(): void =
+    ime = true
+    opRET(RETUtil())
+
+proc opRST(address: uint16): void =
+    opPUSH(pc)
+    pc = address
+
+proc opSTOP(): void =
+    inc pc
+    halted = true
+
+proc opDAA(): void =
+    var value = getReg(A)
+    if not getFlag(ftN):
+        if getFlag(ftH) or ((getReg(A) and 0x0F) > 9):
+            value += 6
+        if getFlag(ftC) or (getReg(A) > 0x99):
+            value += 0x60
+            f.C = true
+    else:
+        if getFlag(ftC):
+            value -= 0x60
+        if getFlag(ftH):
+            value -= 6
+
+    f.Z = value == 0
+    f.H = false
+
+    setReg(A, value)
