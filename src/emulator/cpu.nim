@@ -22,6 +22,11 @@ proc newCpu*(): void =
         raise newException(RomError, "No ROM detected.")
     resetRegState(bus)
 
+template debugUtil*(): void =
+    if bus.readByte(0xFF02) == 0x81'u8:
+        write(stdout, bus.readByte(0xFF01).char)
+        bus.writeByte(0xFF02, 0)
+
 proc fetch*(): uint8 {.inline.} =
     result = bus.readByte(pc)
     inc pc
@@ -41,10 +46,8 @@ proc RETUtil(): uint16 =
 
     return concat(lo, hi)
 
-proc opJP(address: uint16, hl=false): void =
-    pc = address
-    if not hl:
-        bus.internal()
+
+# x8 & x16 LSM
 
 proc opLDr_r(src, dest: R8Type): void =
     setReg(src, getReg(dest))
@@ -59,42 +62,14 @@ proc opLDr_addr(reg: R8Type, address: uint16): void =
 proc opLDaddr_r(address: uint16, reg: R8Type): void =
     bus.writeByte(address, getReg(reg))
 
-proc opLDaddr_SP(): void =
-    let nn = fetchWord()
-    bus.writeByte(nn, lsb(sp))
-    bus.writeByte(nn+1, msb(sp))
-
 proc opLDRP_word(reg: R16Type, data: uint16): void =
     setReg(reg, data)
     bus.internal()
 
-proc opINC(reg: R8Type | R16Type): void =
-    let
-        value = getReg(reg)
-        res = value + 1
-
-    when reg is R8Type:
-        f.Z = res == 0
-        f.N = false
-        f.H = checkHalfCarry(value, 1)
-
-    setReg(reg, res)
-
-proc opDEC(reg: R8Type | R16Type): void =
-    let
-        value = getReg(reg)
-        res = value - 1
-
-    when reg is R8Type:
-        f.Z = res == 0
-        f.N = true
-        f.H = checkHalfBorrow(value, 1)
-
-    setReg(reg, res)
-
-proc opJR(offset: uint16): void =
-    pc += offset
-    bus.internal()
+proc opLDaddr_SP(): void =
+    let nn = fetchWord()
+    bus.writeByte(nn, lsb(sp))
+    bus.writeByte(nn+1, msb(sp))
 
 proc opPUSH(reg: R16Type | uint16): void =
     bus.internal()
@@ -118,13 +93,43 @@ proc opPOP(reg: R16Type): void =
 
     setReg(reg, concat(lo, hi))
 
+
+# control/br
+
 proc opCALL(address: uint16): void =
     opPUSH(pc)
     pc = address
 
+proc opJP(address: uint16, hl = false): void =
+    pc = address
+    if not hl:
+        bus.internal()
+
+proc opJR(offset: uint16): void =
+    pc += offset
+    bus.internal()
+
 proc opRET(address: uint16): void =
     pc = address
     bus.internal()
+
+proc opRETI(): void =
+    ime = true
+    opRET(RETUtil())
+
+proc opRST(address: uint16): void =
+    opPUSH(pc)
+    pc = address
+
+
+# control/misc
+
+proc opSTOP(): void =
+    inc pc
+    halted = true
+
+
+# x8 & x16 ALU
 
 proc alu(op: AluOp, data: uint8): void =
     let acc = getReg(A)
@@ -161,13 +166,13 @@ proc alu(op: AluOp, data: uint8): void =
         f.N = true
         f.H = checkHalfBorrow(acc, data)
         f.C = data > acc
-    
+
     of ADC:
         res = acc + data + getFlag(ftC).uint8
         f.N = false
         f.H = ((acc and 0xF) + (data and 0xF) + getFlag(ftC).uint8) > 0xF
         f.C = (acc.uint16 + data.uint16 + getFlag(ftC).uint16) > 0xFF
-    
+
     of SBC:
         res = acc - getFlag(ftC).uint8 - data
         f.N = true
@@ -179,78 +184,32 @@ proc alu(op: AluOp, data: uint8): void =
     if op != CP:
         setReg(A, res)
 
-proc prefixHandler(): void =
-    let 
-        op = fetch()
-        reg = R8Type(op.z)
-        u8 = getReg(reg)
+proc opINC(reg: R8Type | R16Type): void =
+    let
+        value = getReg(reg)
+        res = value + 1
 
-    var res: uint8
-
-    case op.x
-    of 0x0:
-        let rot = PrefixOp(op.y)
-        case rot
-        of RL:
-            res = (u8 shl 1) or getFlag(ftC).uint8
-            f.Z = res == 0
-            f.C = (u8 shr 7) != 0
-
-        of RR:
-            res = (u8 shr 1) or (getFlag(ftC).uint8 shl 7)
-            f.Z = res == 0
-            f.C = (u8 and 1) == 1
-
-        of RLC:
-            f.C = (u8 shr 7) != 0
-            res = rotateLeftBits(u8, 1) or getFlag(ftC).uint8
-            f.Z = res == 0
-
-        of RRC:
-            f.C = (u8 and 1) == 1
-            res = rotateRightBits(u8, 1) or (0x80 and getFlag(ftC).uint8)
-            f.Z = res == 0
-
-        of SLA:
-            res = (u8 shl 1)
-            f.Z = res == 0
-            f.C = (u8 shr 7) != 0
-
-        of SRL:
-            res = u8 shr 1
-            f.Z = res == 0
-            f.C = (u8 and 1) == 1
-
-        of SRA:
-            res = (u8 shr 1) or (u8 and 0x80)
-            f.Z = res == 0
-            f.C = (u8 and 1) == 1
-
-        of SWAP:
-            res = rotateLeftBits(u8, 4)
-            f.Z = res == 0
-            f.C = false
-
-    of 0x1:
-        f.Z = not getReg(reg).testBit(op.y.uint8)
+    when reg is R8Type:
+        f.Z = res == 0
         f.N = false
-        f.H = true
-    
-    of 0x2:
-        res = u8
-        res.clearBit(op.y.uint8)
+        f.H = checkHalfCarry(value, 1)
 
-    of 0x3:
-        res = u8
-        res.setBit(op.y.uint8)
+    setReg(reg, res)
 
-    if op.x != 1:
-        setReg(reg, res)
-        if op.x == 0:
-            f.N = false; f.H = false;
+proc opDEC(reg: R8Type | R16Type): void =
+    let
+        value = getReg(reg)
+        res = value - 1
+
+    when reg is R8Type:
+        f.Z = res == 0
+        f.N = true
+        f.H = checkHalfBorrow(value, 1)
+
+    setReg(reg, res)
 
 proc opADDHL_RP(reg: R16Type): void =
-    let 
+    let
         hl = getReg(HL)
         data = getReg(reg)
 
@@ -261,8 +220,8 @@ proc opADDHL_RP(reg: R16Type): void =
 
     bus.internal()
 
-proc opADDSP_i8(multiInts=true): void =
-    let 
+proc opADDSP_i8(multiInts = true): void =
+    let
         data = signed(fetch())
         res = sp + data
 
@@ -275,50 +234,6 @@ proc opADDSP_i8(multiInts=true): void =
     if multiInts:
         bus.internal()
     sp = res
-
-proc opRLCA(): void =
-    let acc = getReg(A)
-    f.C = (acc shr 7) != 0
-    let data = rotateLeftBits(acc, 1) or getFlag(ftC).uint8
-    f.Z = false; f.N = false; f.H = false
-    setReg(A, data)
-
-proc opRLA(): void =
-    let 
-        acc = getReg(A)
-        data = (acc shl 1) or getFlag(ftC).uint8
-
-    f.C = (acc shr 7) != 0
-    f.Z = false; f.N = false; f.H = false
-    setReg(A, data)
-
-proc opRRA(): void =
-    let 
-        u8 = getReg(A)
-        res = (u8 shr 1) or (getFlag(ftC).uint8 shl 7)
-
-    f.Z = false; f.N = false; f.H = false
-    f.C = (u8 and 1) == 1
-    setReg(A, res)
-
-proc opRRCA(): void =
-    let acc = getReg(A)
-    f.C = (acc and 1) == 1
-    let data = rotateRightBits(acc, 1) or (0x80 and getFlag(ftC).uint8)
-    f.Z = false; f.N = false; f.H = false
-    setReg(A, data)
-
-proc opRETI(): void =
-    ime = true
-    opRET(RETUtil())
-
-proc opRST(address: uint16): void =
-    opPUSH(pc)
-    pc = address
-
-proc opSTOP(): void =
-    inc pc
-    halted = true
 
 proc opDAA(): void =
     var value = getReg(A)
@@ -338,3 +253,101 @@ proc opDAA(): void =
     f.H = false
 
     setReg(A, value)
+
+
+# x8 Bit Manip.
+
+proc prefixHandler(): void =
+    let
+        op = fetch()
+        reg = R8Type(op.z)
+        u8 = getReg(reg)
+
+    var res: uint8
+
+    case op.x
+    of 0x0:
+        let rot = PrefixOp(op.y)
+        case rot
+        of RL:
+            res = (u8 shl 1) or getFlag(ftC).uint8
+            f.C = (u8 shr 7) != 0
+
+        of RR:
+            res = (u8 shr 1) or (getFlag(ftC).uint8 shl 7)
+            f.C = (u8 and 1) == 1
+
+        of RLC:
+            f.C = (u8 shr 7) != 0
+            res = rotateLeftBits(u8, 1) or getFlag(ftC).uint8
+
+        of RRC:
+            f.C = (u8 and 1) == 1
+            res = rotateRightBits(u8, 1) or (0x80 and getFlag(ftC).uint8)
+
+        of SLA:
+            res = (u8 shl 1)
+            f.C = (u8 shr 7) != 0
+
+        of SRL:
+            res = u8 shr 1
+            f.C = (u8 and 1) == 1
+
+        of SRA:
+            res = (u8 shr 1) or (u8 and 0x80)
+            f.C = (u8 and 1) == 1
+
+        of SWAP:
+            res = rotateLeftBits(u8, 4)
+            f.C = false
+
+    of 0x1:
+        f.Z = not getReg(reg).testBit(op.y.uint8)
+        f.N = false
+        f.H = true
+
+    of 0x2:
+        res = u8
+        res.clearBit(op.y.uint8)
+
+    of 0x3:
+        res = u8
+        res.setBit(op.y.uint8)
+
+    if op.x != 1:
+        setReg(reg, res)
+        if op.x == 0:
+            f.Z = res == 0
+            f.N = false; f.H = false
+
+proc opRLA(): void =
+    let
+        acc = getReg(A)
+        data = (acc shl 1) or getFlag(ftC).uint8
+
+    f.C = (acc shr 7) != 0
+    f.Z = false; f.N = false; f.H = false
+    setReg(A, data)
+
+proc opRLCA(): void =
+    let acc = getReg(A)
+    f.C = (acc shr 7) != 0
+    let data = rotateLeftBits(acc, 1) or getFlag(ftC).uint8
+    f.Z = false; f.N = false; f.H = false
+    setReg(A, data)
+
+proc opRRA(): void =
+    let
+        u8 = getReg(A)
+        res = (u8 shr 1) or (getFlag(ftC).uint8 shl 7)
+
+    f.Z = false; f.N = false; f.H = false
+    f.C = (u8 and 1) == 1
+    setReg(A, res)
+
+proc opRRCA(): void =
+    let acc = getReg(A)
+    f.C = (acc and 1) == 1
+    let data = rotateRightBits(acc, 1) or (0x80 and getFlag(ftC).uint8)
+    f.Z = false; f.N = false; f.H = false
+    setReg(A, data)
