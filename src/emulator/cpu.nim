@@ -361,3 +361,115 @@ proc opRRCA(): void =
     let data = rotateRightBits(acc, 1) or (0x80 and getFlag(ftC).uint8)
     f.Z = false; f.N = false; f.H = false
     setReg(A, data)
+
+
+proc cpuStep*(): void =
+    
+    currOp = fetch()
+    if currOp == 0xCB:
+        prefixHandler()
+        return
+
+    case currOp.x
+    of 0x0:
+        case currOp.z
+        of 0x0:
+            case currOp.y
+            of 0x0: return
+            of 0x1: opLDaddr_SP()
+            of 0x2: opSTOP()
+            of 0x3: opJR()
+            of 0x4..0x7: opJRcond(CCType(currOp.y - 4))
+        of 0x1:
+            if not currOp.q: opLDr_n(R16Type(currOp.p)) else: opADDHL_RP(
+                    R16Type(currOp.p))
+        of 0x2:
+            if not currOp.q:
+                case currOp.p
+                of 0x0: opLDaddr_r(getReg(BC), A)
+                of 0x1: opLDaddr_r(getReg(DE), A)
+                of 0x2:
+                    let data = getReg(HL)
+                    opLDaddr_r(data, A)
+                    setReg(HL, data + 1)
+                of 0x3:
+                    let data = getReg(HL)
+                    opLDaddr_r(data, A)
+                    setReg(HL, data - 1)
+            else:
+                case currOp.p
+                of 0x0: opLDr_addr(A, getReg(BC))
+                of 0x1: opLDr_addr(A, getReg(DE))
+                of 0x2:
+                    let data = getReg(HL)
+                    opLDr_addr(A, data)
+                    setReg(HL, data + 1)
+                of 0x3:
+                    let data = getReg(HL)
+                    opLDr_addr(A, data)
+                    setReg(HL, data - 1)
+        of 0x3:
+            if not currOp.q: opINC(R16Type(currOp.p)) else: opDEC(R16Type(currOp.p))
+        of 0x4: opINC(R8Type(currOp.y))
+        of 0x5: opDEC(R8Type(currOp.y))
+        of 0x6: opLDr_n(R8Type(currOp.y))
+        of 0x7:
+            case currOp.y
+            of 0x0: opRLCA()
+            of 0x1: opRRCA()
+            of 0x2: opRLA()
+            of 0x3: opRRA()
+            of 0x4: opDAA()
+            of 0x5: setReg(A, not getReg(A)); f.N = true; f.H = true
+            of 0x6: f.C = true; f.N = false; f.H = false
+            of 0x7: f.C = not getFlag(ftC); f.N = false; f.H = false
+    of 0x1:
+        if currOp.z == 0x6 and currOp.y == 0x6: halted = true else: opLDr_r(
+                R8Type(currOp.y), R8Type(currOp.z))
+    of 0x2: alu(AluOp(currOp.y), getReg(R8Type(currOp.z)))
+    of 0x3:
+        case currOp.z
+        of 0x0:
+            case currOp.y
+            of 0x0..0x3: opRETcond(CCType(currOp.y))
+            of 0x4: opLDaddr_r(0xFF00 + fetch().uint16, A)
+            of 0x5: opADDSP_i8()
+            of 0x6: opLDr_addr(A, 0xFF00 + fetch().uint16)
+            of 0x7:
+                let old_sp = sp
+                opADDSP_i8(internals = false)
+                opLDRP_word(HL, sp)
+                sp = old_sp
+        of 0x1:
+            if not currOp.q: opPOP(group2adjust(currOp.p))
+            else:
+                case currOp.p
+                of 0x0: opRET(POPUtil())
+                of 0x1: opRETI()
+                of 0x2: opJP(getReg(HL), hl = true)
+                of 0x3: opLDRP_word(SP, getReg(HL))
+        of 0x2:
+            case currOp.y
+            of 0x0..0x3:
+                let nn = fetchWord()
+                if getCC(CCType(currOp.y)): opJP(nn)
+            of 0x4: opLDaddr_r(0xFF00'u16 + getReg(C), A)
+            of 0x5: opLDaddr_r(fetchWord(), A)
+            of 0x6: opLDr_addr(A, 0xFF00'u16 + getReg(C))
+            of 0x7: opLDr_addr(A, fetchWord())
+        of 0x3:
+            case currOp.y
+            of 0x0: opJP(fetchWord())
+            of 0x6: IME = false
+            of 0x7: IMERising = true
+            else: quit("INVALID OPCODE: " & currOp.toHex)
+        of 0x4:
+            let nn = fetchWord()
+            if getCC(CCType(currOp.y)): opCALL(nn)
+        of 0x5:
+            if not currOp.q: opPUSH(group2adjust(currOp.p))
+            else:
+                if currOp.p == 0: opCALL(fetchWord())
+                else: quit("INVALID OPCODE: " & currOp.toHex)
+        of 0x6: alu(AluOp(currOp.y), fetch())
+        of 0x7: opCALL(currOp.y * 8)
