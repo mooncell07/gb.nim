@@ -7,7 +7,7 @@ type
     Bus* = ref object
         rom*: ROM
 
-#TODO: Add support for External RAM, OAM, IO and IE.
+#TODO: Add support for External RAM, OAM
 
 proc readByte*(self: Bus, address: uint16, incr = true): uint8 =
     if address.isboundto(0, 0x8000'u16):
@@ -16,11 +16,14 @@ proc readByte*(self: Bus, address: uint16, incr = true): uint8 =
     elif address.isboundto(0xC000'u16, 0xDFFF'u16):
         result = wram[address - 0xC000'u16]
 
-    elif address.isboundto(0xFF80'u16, 0xFFFE'u16):
-        result = hram[address - 0xFF80'u16]
-
     elif address.isboundto(0xFF00'u16, 0xFF7F'u16):
         result = ioReadByte(address)
+
+    elif address.isboundto(0xFF80'u16, 0xFFFE'u16):
+        result = hram[address - 0xFF80'u16]
+    
+    elif address == 0xFFFF'u16:
+        result = IE
 
     if incr:
         incCycle(1)
@@ -32,11 +35,14 @@ proc writeByte*(self: Bus, address: uint16, data: uint8, incr = true): void =
     elif address.isboundto(0xC000'u16, 0xDFFF'u16):
         wram[address - 0xC000'u16] = data
 
+    elif address.isboundto(0xFF00'u16, 0xFF7F'u16):
+        ioWriteByte(address, data)
+
     elif address.isboundto(0xFF80'u16, 0xFFFE'u16):
         hram[address - 0xFF80'u16] = data
 
-    elif address.isboundto(0xFF00'u16, 0xFF7F'u16):
-        ioWriteByte(address, data)
+    elif address == 0xFFFF'u16:
+        IE = data
 
     if incr:
         incCycle(1)

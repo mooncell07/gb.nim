@@ -1,11 +1,11 @@
+import bitops
 import os
+import strutils
 
 import memory
 import registers
-import bitops
 import utils
 import types
-import strutils
 import bus as membBus
 
 var
@@ -105,7 +105,6 @@ proc opJR(): void =
 
 proc opJRcond(cond: CCType): void =
     let offset = fetch()
-    #echo cond, " ", getCC(cond)
     if getCC(cond):
         pc += offset.signed
         bus.internal()

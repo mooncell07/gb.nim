@@ -25,7 +25,7 @@ proc read*(self: ROM, address: uint16): uint8 =
     return self.data[address].uint8
 
 proc write*(self: ROM, address: uint16, data: uint8): void =
-    self.data[address] = data.char
+    echo "CART. WRITE is not supported"
 
 proc fillHeaders(self: ROM): void =
     self.title = self.data[0x0134..0x0143]
