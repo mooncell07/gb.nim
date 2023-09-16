@@ -1,31 +1,28 @@
 import os
 
-import bus as memBus
 import memory
 import registers
 import bitops
 import utils
 import types
 import strutils
+import bus as membBus
 
-var bus*: Bus
-var currOp*: uint8
-var ime*: bool
-var halted: bool = false
+var
+    bus*: Bus
+    currOp*: uint8
+    halted*: bool = false
 
-proc newCpu*(): void =
-    let args = commandLineParams()
+    IME*: bool = false
+    IMERising* = false
 
-    if args.len() > 0:
-        bus = Bus(rom: memory.newROM(args[0]))
-    else:
-        raise newException(RomError, "No ROM detected.")
-    resetRegState(bus)
+proc connectCpu*(mbus: var Bus): void =
+    bus = mbus
 
 template debugUtil*(): void =
-    if bus.readByte(0xFF02) == 0x81'u8:
-        write(stdout, bus.readByte(0xFF01).char)
-        bus.writeByte(0xFF02, 0)
+    if bus.readByte(0xFF02'u16, incr=false) == 0x81'u8:
+        write(stdout, bus.readByte(0xFF01'u16, incr=false).char)
+        bus.writeByte(0xFF02'u16, 0, incr=false)
 
 proc fetch*(): uint8 {.inline.} =
     result = bus.readByte(pc)
@@ -38,7 +35,7 @@ proc fetchWord*(): uint16 {.inline.} =
 
     return concat(lo, hi)
 
-proc RETUtil(): uint16 =
+proc POPUtil(): uint16 =
     let lo = bus.readByte(sp)
     inc sp
     let hi = bus.readByte(sp)
@@ -71,8 +68,9 @@ proc opLDaddr_SP(): void =
     bus.writeByte(nn, lsb(sp))
     bus.writeByte(nn+1, msb(sp))
 
-proc opPUSH(reg: R16Type | uint16): void =
-    bus.internal()
+proc opPUSH(reg: R16Type | uint16, internal: bool = true): void =
+    if internal:
+        bus.internal()
     var data: uint16
 
     when reg is R16Type:
@@ -86,18 +84,13 @@ proc opPUSH(reg: R16Type | uint16): void =
     bus.writeByte(sp, lsb(data))
 
 proc opPOP(reg: R16Type): void =
-    let lo = bus.readByte(sp)
-    inc sp
-    let hi = bus.readByte(sp)
-    inc sp
-
-    setReg(reg, concat(lo, hi))
+    setReg(reg, POPUtil())
 
 
 # control/br
 
-proc opCALL(address: uint16): void =
-    opPUSH(pc)
+proc opCALL*(address: uint16, internal: bool = true): void =
+    opPUSH(pc, internal)
     pc = address
 
 proc opJP(address: uint16, hl = false): void =
@@ -105,21 +98,31 @@ proc opJP(address: uint16, hl = false): void =
     if not hl:
         bus.internal()
 
-proc opJR(offset: uint16): void =
-    pc += offset
+proc opJR(): void =
+    let offset = fetch()
+    pc += offset.signed
     bus.internal()
+
+proc opJRcond(cond: CCType): void =
+    let offset = fetch()
+    #echo cond, " ", getCC(cond)
+    if getCC(cond):
+        pc += offset.signed
+        bus.internal()
 
 proc opRET(address: uint16): void =
     pc = address
     bus.internal()
 
-proc opRETI(): void =
-    ime = true
-    opRET(RETUtil())
+proc opRETcond(cond: CCType): void =
+    if getCC(cond):
+        pc = POPUtil()
+        bus.internal()
+    bus.internal()
 
-proc opRST(address: uint16): void =
-    opPUSH(pc)
-    pc = address
+proc opRETI(): void =
+    IME = true
+    opRET(POPUtil())
 
 
 # control/misc
@@ -193,6 +196,9 @@ proc opINC(reg: R8Type | R16Type): void =
         f.Z = res == 0
         f.N = false
         f.H = checkHalfCarry(value, 1)
+    
+    when reg is R16Type:
+        bus.internal()
 
     setReg(reg, res)
 
@@ -205,6 +211,9 @@ proc opDEC(reg: R8Type | R16Type): void =
         f.Z = res == 0
         f.N = true
         f.H = checkHalfBorrow(value, 1)
+
+    when reg is R16Type:
+        bus.internal()
 
     setReg(reg, res)
 
@@ -220,7 +229,7 @@ proc opADDHL_RP(reg: R16Type): void =
 
     bus.internal()
 
-proc opADDSP_i8(multiInts = true): void =
+proc opADDSP_i8(internals = true): void =
     let
         data = signed(fetch())
         res = sp + data
@@ -229,10 +238,10 @@ proc opADDSP_i8(multiInts = true): void =
     f.H = (sp and 0xF) + (data and 0xF) > 0xF
     f.C = (sp and 0xFF) + (data and 0xFF) > 0xFF
 
-    bus.internal()
-
-    if multiInts:
+    if internals:
         bus.internal()
+        bus.internal()
+
     sp = res
 
 proc opDAA(): void =
@@ -261,13 +270,15 @@ proc prefixHandler(): void =
     let
         op = fetch()
         reg = R8Type(op.z)
-        u8 = getReg(reg)
 
     var res: uint8
 
     case op.x
     of 0x0:
-        let rot = PrefixOp(op.y)
+        let 
+            rot = PrefixOp(op.y)
+            u8 = getReg(reg)
+
         case rot
         of RL:
             res = (u8 shl 1) or getFlag(ftC).uint8
@@ -307,11 +318,11 @@ proc prefixHandler(): void =
         f.H = true
 
     of 0x2:
-        res = u8
+        res = getReg(reg)
         res.clearBit(op.y.uint8)
 
     of 0x3:
-        res = u8
+        res = getReg(reg)
         res.setBit(op.y.uint8)
 
     if op.x != 1:
