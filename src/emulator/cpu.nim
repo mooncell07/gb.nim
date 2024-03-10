@@ -2,30 +2,26 @@ import bitops
 import os
 import strutils
 
-import memory
 import registers
 import utils
 import types
-import bus as membBus
+import bus
 
 var
-    bus*: Bus
-    currOp*: uint8
+    opcode*: uint8 = 0x00
     halted*: bool = false
 
     IME*: bool = false
-    IMERising* = false
+    IMERising*: bool = false
 
-proc connectCpu*(mbus: var Bus): void =
-    bus = mbus
 
 template debugUtil*(): void =
-    if bus.readByte(0xFF02'u16, incr=false) == 0x81'u8:
-        write(stdout, bus.readByte(0xFF01'u16, incr=false).char)
-        bus.writeByte(0xFF02'u16, 0, incr=false)
+    if readByte(0xFF02, incr = false) == 0x81'u8:
+        write(stdout, readByte(0xFF01, incr = false).char)
+        writeByte(0xFF02, 0, incr = false)
 
 proc fetch*(): uint8 {.inline.} =
-    result = bus.readByte(pc)
+    result = readByte(pc)
     inc pc
 
 proc fetchWord*(): uint16 {.inline.} =
@@ -35,16 +31,30 @@ proc fetchWord*(): uint16 {.inline.} =
 
     return concat(lo, hi)
 
-proc POPUtil(): uint16 =
-    let lo = bus.readByte(sp)
+proc pop(): uint16 =
+    let lo = readByte(sp)
     inc sp
-    let hi = bus.readByte(sp)
+    let hi = readByte(sp)
     inc sp
 
     return concat(lo, hi)
 
+proc push(data: uint16): void =
+    dec sp
+    writeByte(sp, msb(data))
+    dec sp
+    writeByte(sp, lsb(data))
+
+proc jump*(address: uint16, internal: bool = true): void =
+    if internal:
+        internal()
+
+    push(pc)
+    pc = address
+
 
 # x8 & x16 LSM
+# ------------
 
 proc opLDr_r(src, dest: R8Type): void =
     setReg(src, getReg(dest))
@@ -54,23 +64,23 @@ proc opLDr_n(reg: R8Type | R16Type): void =
     else: setReg(reg, fetchWord())
 
 proc opLDr_addr(reg: R8Type, address: uint16): void =
-    setReg(reg, bus.readByte(address))
+    setReg(reg, readByte(address))
 
 proc opLDaddr_r(address: uint16, reg: R8Type): void =
-    bus.writeByte(address, getReg(reg))
+    writeByte(address, getReg(reg))
 
 proc opLDRP_word(reg: R16Type, data: uint16): void =
     setReg(reg, data)
-    bus.internal()
+    internal()
 
 proc opLDaddr_SP(): void =
     let nn = fetchWord()
-    bus.writeByte(nn, lsb(sp))
-    bus.writeByte(nn+1, msb(sp))
+    writeByte(nn, lsb(sp))
+    writeByte(nn+1, msb(sp))
 
 proc opPUSH(reg: R16Type | uint16, internal: bool = true): void =
     if internal:
-        bus.internal()
+        internal()
     var data: uint16
 
     when reg is R16Type:
@@ -78,53 +88,51 @@ proc opPUSH(reg: R16Type | uint16, internal: bool = true): void =
     else:
         data = reg
 
-    dec sp
-    bus.writeByte(sp, msb(data))
-    dec sp
-    bus.writeByte(sp, lsb(data))
+    push(data)
 
 proc opPOP(reg: R16Type): void =
-    setReg(reg, POPUtil())
+    setReg(reg, pop())
 
 
 # control/br
+# ----------
 
 proc opCALL*(address: uint16, internal: bool = true): void =
-    opPUSH(pc, internal)
-    pc = address
+    jump(address, internal)
 
 proc opJP(address: uint16, hl = false): void =
     pc = address
     if not hl:
-        bus.internal()
+        internal()
 
 proc opJR(): void =
     let offset = fetch()
     pc += offset.signed
-    bus.internal()
+    internal()
 
 proc opJRcond(cond: CCType): void =
     let offset = fetch()
     if getCC(cond):
         pc += offset.signed
-        bus.internal()
+        internal()
 
 proc opRET(address: uint16): void =
     pc = address
-    bus.internal()
+    internal()
 
 proc opRETcond(cond: CCType): void =
     if getCC(cond):
-        pc = POPUtil()
-        bus.internal()
-    bus.internal()
+        pc = pop()
+        internal()
+    internal()
 
 proc opRETI(): void =
     IME = true
-    opRET(POPUtil())
+    opRET(pop())
 
 
 # control/misc
+#-------------
 
 proc opSTOP(): void =
     inc pc
@@ -132,6 +140,7 @@ proc opSTOP(): void =
 
 
 # x8 & x16 ALU
+# ------------
 
 proc alu(op: AluOp, data: uint8): void =
     let acc = getReg(A)
@@ -195,9 +204,9 @@ proc opINC(reg: R8Type | R16Type): void =
         f.Z = res == 0
         f.N = false
         f.H = checkHalfCarry(value, 1)
-    
+
     when reg is R16Type:
-        bus.internal()
+        internal()
 
     setReg(reg, res)
 
@@ -212,7 +221,7 @@ proc opDEC(reg: R8Type | R16Type): void =
         f.H = checkHalfBorrow(value, 1)
 
     when reg is R16Type:
-        bus.internal()
+        internal()
 
     setReg(reg, res)
 
@@ -226,7 +235,7 @@ proc opADDHL_RP(reg: R16Type): void =
     f.H = (hl and 0xFFF) + (data and 0xFFF) > 0xFFF
     f.C = (hl.uint32 + data.uint32) > 0xFFFF
 
-    bus.internal()
+    internal()
 
 proc opADDSP_i8(internals = true): void =
     let
@@ -238,8 +247,8 @@ proc opADDSP_i8(internals = true): void =
     f.C = (sp and 0xFF) + (data and 0xFF) > 0xFF
 
     if internals:
-        bus.internal()
-        bus.internal()
+        internal()
+        internal()
 
     sp = res
 
@@ -264,6 +273,7 @@ proc opDAA(): void =
 
 
 # x8 Bit Manip.
+# -------------
 
 proc prefixHandler(): void =
     let
@@ -274,7 +284,7 @@ proc prefixHandler(): void =
 
     case op.x
     of 0x0:
-        let 
+        let
             rot = PrefixOp(op.y)
             u8 = getReg(reg)
 
@@ -362,30 +372,28 @@ proc opRRCA(): void =
     f.Z = false; f.N = false; f.H = false
     setReg(A, data)
 
-
-proc cpuStep*(): void =
-    
-    currOp = fetch()
-    if currOp == 0xCB:
+proc tick*(): void =
+    opcode = fetch()
+    if opcode == 0xCB:
         prefixHandler()
         return
 
-    case currOp.x
+    case opcode.x
     of 0x0:
-        case currOp.z
+        case opcode.z
         of 0x0:
-            case currOp.y
+            case opcode.y
             of 0x0: return
             of 0x1: opLDaddr_SP()
             of 0x2: opSTOP()
             of 0x3: opJR()
-            of 0x4..0x7: opJRcond(CCType(currOp.y - 4))
+            of 0x4..0x7: opJRcond(CCType(opcode.y - 4))
         of 0x1:
-            if not currOp.q: opLDr_n(R16Type(currOp.p)) else: opADDHL_RP(
-                    R16Type(currOp.p))
+            if not opcode.q: opLDr_n(R16Type(opcode.p)) else: opADDHL_RP(
+                    R16Type(opcode.p))
         of 0x2:
-            if not currOp.q:
-                case currOp.p
+            if not opcode.q:
+                case opcode.p
                 of 0x0: opLDaddr_r(getReg(BC), A)
                 of 0x1: opLDaddr_r(getReg(DE), A)
                 of 0x2:
@@ -397,7 +405,7 @@ proc cpuStep*(): void =
                     opLDaddr_r(data, A)
                     setReg(HL, data - 1)
             else:
-                case currOp.p
+                case opcode.p
                 of 0x0: opLDr_addr(A, getReg(BC))
                 of 0x1: opLDr_addr(A, getReg(DE))
                 of 0x2:
@@ -409,12 +417,12 @@ proc cpuStep*(): void =
                     opLDr_addr(A, data)
                     setReg(HL, data - 1)
         of 0x3:
-            if not currOp.q: opINC(R16Type(currOp.p)) else: opDEC(R16Type(currOp.p))
-        of 0x4: opINC(R8Type(currOp.y))
-        of 0x5: opDEC(R8Type(currOp.y))
-        of 0x6: opLDr_n(R8Type(currOp.y))
+            if not opcode.q: opINC(R16Type(opcode.p)) else: opDEC(R16Type(opcode.p))
+        of 0x4: opINC(R8Type(opcode.y))
+        of 0x5: opDEC(R8Type(opcode.y))
+        of 0x6: opLDr_n(R8Type(opcode.y))
         of 0x7:
-            case currOp.y
+            case opcode.y
             of 0x0: opRLCA()
             of 0x1: opRRCA()
             of 0x2: opRLA()
@@ -424,14 +432,14 @@ proc cpuStep*(): void =
             of 0x6: f.C = true; f.N = false; f.H = false
             of 0x7: f.C = not getFlag(ftC); f.N = false; f.H = false
     of 0x1:
-        if currOp.z == 0x6 and currOp.y == 0x6: halted = true else: opLDr_r(
-                R8Type(currOp.y), R8Type(currOp.z))
-    of 0x2: alu(AluOp(currOp.y), getReg(R8Type(currOp.z)))
+        if opcode.z == 0x6 and opcode.y == 0x6: halted = true else: opLDr_r(
+                R8Type(opcode.y), R8Type(opcode.z))
+    of 0x2: alu(AluOp(opcode.y), getReg(R8Type(opcode.z)))
     of 0x3:
-        case currOp.z
+        case opcode.z
         of 0x0:
-            case currOp.y
-            of 0x0..0x3: opRETcond(CCType(currOp.y))
+            case opcode.y
+            of 0x0..0x3: opRETcond(CCType(opcode.y))
             of 0x4: opLDaddr_r(0xFF00 + fetch().uint16, A)
             of 0x5: opADDSP_i8()
             of 0x6: opLDr_addr(A, 0xFF00 + fetch().uint16)
@@ -441,35 +449,35 @@ proc cpuStep*(): void =
                 opLDRP_word(HL, sp)
                 sp = old_sp
         of 0x1:
-            if not currOp.q: opPOP(group2adjust(currOp.p))
+            if not opcode.q: opPOP(group2adjust(opcode.p))
             else:
-                case currOp.p
-                of 0x0: opRET(POPUtil())
+                case opcode.p
+                of 0x0: opRET(pop())
                 of 0x1: opRETI()
                 of 0x2: opJP(getReg(HL), hl = true)
                 of 0x3: opLDRP_word(SP, getReg(HL))
         of 0x2:
-            case currOp.y
+            case opcode.y
             of 0x0..0x3:
                 let nn = fetchWord()
-                if getCC(CCType(currOp.y)): opJP(nn)
+                if getCC(CCType(opcode.y)): opJP(nn)
             of 0x4: opLDaddr_r(0xFF00'u16 + getReg(C), A)
             of 0x5: opLDaddr_r(fetchWord(), A)
             of 0x6: opLDr_addr(A, 0xFF00'u16 + getReg(C))
             of 0x7: opLDr_addr(A, fetchWord())
         of 0x3:
-            case currOp.y
+            case opcode.y
             of 0x0: opJP(fetchWord())
             of 0x6: IME = false
             of 0x7: IMERising = true
-            else: quit("INVALID OPCODE: " & currOp.toHex)
+            else: quit("INVALID OPCODE: " & opcode.toHex)
         of 0x4:
             let nn = fetchWord()
-            if getCC(CCType(currOp.y)): opCALL(nn)
+            if getCC(CCType(opcode.y)): opCALL(nn)
         of 0x5:
-            if not currOp.q: opPUSH(group2adjust(currOp.p))
+            if not opcode.q: opPUSH(group2adjust(opcode.p))
             else:
-                if currOp.p == 0: opCALL(fetchWord())
-                else: quit("INVALID OPCODE: " & currOp.toHex)
-        of 0x6: alu(AluOp(currOp.y), fetch())
-        of 0x7: opCALL(currOp.y * 8)
+                if opcode.p == 0: opCALL(fetchWord())
+                else: quit("INVALID OPCODE: " & opcode.toHex)
+        of 0x6: alu(AluOp(opcode.y), fetch())
+        of 0x7: opCALL(opcode.y * 8)

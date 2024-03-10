@@ -1,10 +1,5 @@
 import utils
 
-var
-    wram*: array[0x2000, uint8]
-    hram*: array[0x80, uint8]
-
-
 type
     ROM* = ref object
         data: string
@@ -20,6 +15,7 @@ type
         checksum: uint8
 
     RomError* = object of ValueError
+
 
 proc read*(self: ROM, address: uint16): uint8 =
     return self.data[address].uint8

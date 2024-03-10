@@ -1,55 +1,55 @@
-import memory
+import cartridge
 import utils
 import timer
 import io
 
-type
-    Bus* = ref object
-        rom*: ROM
+var
+    rom*: ROM
+    wram*: array[0x2000, uint8]
+    hram*: array[0x80, uint8]
 
-#TODO: Add support for External RAM, OAM
 
-proc readByte*(self: Bus, address: uint16, incr = true): uint8 =
-    if address.isboundto(0, 0x8000'u16):
-        result = self.rom.read(address)
+proc readByte*(address: uint16, incr = true): uint8 =
+    if address.isboundto(0, 0x7FFF):
+        result = rom.read(address)
 
-    elif address.isboundto(0xC000'u16, 0xDFFF'u16):
-        result = wram[address - 0xC000'u16]
+    elif address.isboundto(0xC000, 0xDFFF):
+        result = wram[address - 0xC000]
 
-    elif address.isboundto(0xFF00'u16, 0xFF7F'u16):
+    elif address.isboundto(0xFF00, 0xFF7F):
         result = ioReadByte(address)
 
-    elif address.isboundto(0xFF80'u16, 0xFFFE'u16):
-        result = hram[address - 0xFF80'u16]
-    
-    elif address == 0xFFFF'u16:
+    elif address.isboundto(0xFF80, 0xFFFE):
+        result = hram[address - 0xFF80]
+
+    elif address == 0xFFFF:
         result = IE
 
     if incr:
         incCycle(1)
 
-proc writeByte*(self: Bus, address: uint16, data: uint8, incr = true): void =
-    if address.isboundto(0, 0x8000'u16):
-        self.rom.write(address, data)
+proc writeByte*(address: uint16, data: uint8, incr = true): void =
+    if address.isboundto(0, 0x7FFF):
+        rom.write(address, data)
 
-    elif address.isboundto(0xC000'u16, 0xDFFF'u16):
-        wram[address - 0xC000'u16] = data
+    elif address.isboundto(0xC000, 0xDFFF):
+        wram[address - 0xC000] = data
 
-    elif address.isboundto(0xFF00'u16, 0xFF7F'u16):
+    elif address.isboundto(0xFF00, 0xFF7F):
         ioWriteByte(address, data)
 
-    elif address.isboundto(0xFF80'u16, 0xFFFE'u16):
-        hram[address - 0xFF80'u16] = data
+    elif address.isboundto(0xFF80, 0xFFFE):
+        hram[address - 0xFF80] = data
 
-    elif address == 0xFFFF'u16:
+    elif address == 0xFFFF:
         IE = data
 
     if incr:
         incCycle(1)
 
-proc writeWord*(self: Bus, address, data: uint16): void =
-    self.writeByte(address, data.lsb)
-    self.writeByte(address + 1, data.msb)
+proc writeWord*(address, data: uint16): void =
+    writeByte(address, data.lsb)
+    writeByte(address + 1, data.msb)
 
-proc internal*(self: Bus): void =
+proc internal*(): void =
     incCycle(1)

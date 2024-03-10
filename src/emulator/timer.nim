@@ -1,11 +1,12 @@
-import utils
 import bitops
+
 import types
 import io
+import utils
 
 var
     cycles*: int
-    oldDiv: uint16
+
 
 proc clockSelect(): int =
     let freq: u2 = TAC.bitsliced(0..1)
@@ -15,17 +16,19 @@ proc clockSelect(): int =
     of 2: 5
     of 3: 7
 
-proc timerTick(): void =
-    oldDiv = DIV
+proc tick(): void =
+    let oldDiv = DIV
     inc DIV
 
     let freq = clockSelect()
     if testBit(DIV, freq) and (not testBit(oldDIV, freq)) and TAC.testBit(2):
         if (TIMA == 0xFF):
+            TIMA = TMA
             sendIntReq(TIMER)
+
         inc TIMA
 
-proc incCycle*(n: int): void =
-    for i in 0..<(n*4):
+proc incCycle*(m: int): void =
+    for i in 0..<(m*4):
         inc cycles
-        timerTick()
+        tick()

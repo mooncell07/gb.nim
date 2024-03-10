@@ -2,6 +2,7 @@ nimcache/
 nimblecache/
 htmldocs/
 
+tests/
 bin/
 logs.txt
 test.nim

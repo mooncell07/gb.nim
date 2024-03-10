@@ -5,6 +5,7 @@ type
     u2* = range[0'u8..3'u8]
     u3* = range[0'u8..7'u8]
 
+
 func lsb*(value: uint16): uint8 {.inline.} = (value and 0xFF).uint8
 func msb*(value: uint16): uint8 {.inline.} = (value shr 8).uint8
 func concat*(lo: uint8, hi: uint16): uint16 {.inline.} = (hi shl 8) or lo
