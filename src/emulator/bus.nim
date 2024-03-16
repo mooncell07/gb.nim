@@ -19,6 +19,7 @@ var
     rom*: ROM
     wram: array[0x2000, uint8]
     hram: array[0x80, uint8]
+    bootRom*: string
 
     # TODO: add support for external ram
     mockExternalRam: array[0x2000, uint8]
@@ -48,7 +49,11 @@ proc readByte*(address: uint16, incr = true, conflict = true): uint8 =
         return
 
     if address.isboundto(0, 0x7FFF):
-        result = rom.read(address)
+
+        if booting and address.isboundto(0, 0xFF):
+            result = bootRom[address].uint8
+        else:
+            result = rom.read(address)
 
     elif address.isboundto(0x8000, 0x9FFF):
         result = bus.readByte(address)

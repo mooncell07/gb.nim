@@ -5,10 +5,10 @@ import types
 import utils
 
 var
-    r8: array[R8Type, uint8] = [0x00, 0x13, 0x00, 0xD8, 0x01, 0x4D, 0x00, 0x01]
-    pc*: uint16 = 0x0100
-    sp*: uint16 = 0xFFFE
-    f*: uint8 = 0xB0
+    r8*: array[R8Type, uint8]
+    pc*: uint16
+    sp*: uint16
+    f*: uint8
 
 
 proc getReg*(r: R16Type): uint16 {.inline.} =
