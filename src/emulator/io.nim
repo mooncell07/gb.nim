@@ -76,3 +76,15 @@ proc setIoReg*(address: int, data: uint8): void =
 
 proc sendIntReq*(ISR: IntType): void =
     setBit(IF, ISR.ord)
+
+proc getLCDC*(lct: LCDCType): bool = return LCDC.testBit(lct.ord)
+proc getLCDS*(lst: LCDSType): bool = return STAT.testBit(lst.ord)
+proc `LCDS=`*(lst: LCDSType, value: bool): void = 
+    if value: STAT.setBit(lst.ord) else: STAT.clearBit(lst.ord)
+
+proc getTileMapOffset*(win: bool = false): uint16 =
+    let flag = if win: getLCDC(WINTILEMAPAREA) else: getLCDC(BGTILEMAPAREA)
+    return if flag: 0x9C00 else: 0x9800
+
+proc getTileDataOffset*(): uint16 = 
+    return if getLCDC(BGANDWINTILEDATAAREA): 0x8000 else: 0x8800
