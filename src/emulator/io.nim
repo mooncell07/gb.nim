@@ -87,4 +87,4 @@ proc getTileMapOffset*(win: bool = false): uint16 =
     return if flag: 0x9C00 else: 0x9800
 
 proc getTileDataOffset*(): uint16 = 
-    return if getLCDC(BGANDWINTILEDATAAREA): 0x8000 else: 0x8800
+    return if getLCDC(BGANDWINTILEDATAAREA): 0x8000 else: 0x9000
