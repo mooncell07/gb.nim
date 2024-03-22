@@ -6,5 +6,3 @@ tests/
 bin/
 logs.txt
 test.nim
-*.gb
-restricted.txt
