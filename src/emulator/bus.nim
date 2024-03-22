@@ -133,7 +133,6 @@ proc tick(d: DMA): void =
     inc d.currentIndex
 
     if d.currentIndex == 0xA0:
-
         d.active = false
         d.starting = false
         d.initialDelay = 0
