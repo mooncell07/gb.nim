@@ -5,6 +5,7 @@ type
     FlagType* {.pure.} = enum ftC = 4, ftH = 5, ftN = 6, ftZ = 7
     AluOp* {.pure.} = enum ADD, ADC, SUB, SBC, AND, XOR, OR, CP
     PrefixOp* {.pure.} = enum RLC, RRC, RL, RR, SLA, SRA, SWAP, SRL
-    IntType* {.pure.} = enum VBLANK, LCDSTAT, TIMER, SERIAL, JOYPAD
+    IntType* {.pure.} = enum INTVBLANK, INTSTAT, INTTIMER, INTSERIAL, INTJOYPAD
     LCDCType* {.pure.} = enum BGANDWINEN, OBJEN, OBJSIZE, BGTILEMAPAREA, BGANDWINTILEDATAAREA, WINEN, WINTILEMAPAREA, LCDPPUEN
     LCDSType* {.pure.} = enum PPUMODEBIT0, PPUMODEBIT1, COINCIDENCE, MODE0INT, MODE1INT, MODE2INT, LYCINT
+    PPUStateType* {.pure.} = enum HBLANK, VBLANK, OAMSEARCH, PIXELTRANSFER

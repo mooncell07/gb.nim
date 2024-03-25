@@ -3,9 +3,7 @@ import bitops
 import types
 import io
 import utils
-
-var
-    cycles*: int
+import graphics/ppu
 
 
 proc clockSelect(): int =
@@ -24,11 +22,11 @@ proc tick(): void =
     if testBit(DIV, freq) and (not testBit(oldDIV, freq)) and TAC.testBit(2):
         if (TIMA == 0xFF):
             TIMA = TMA
-            sendIntReq(TIMER)
+            sendIntReq(INTTIMER)
 
         inc TIMA
 
 proc incCycle*(m: int): void =
     for i in 0..<(m*4):
-        inc cycles
         tick()
+        ppu.tick()
