@@ -1,4 +1,8 @@
 import ../[io, types]
+import fetcher
+import deques
+import lcd
+import bitops
 
 var
     state: PPUStateType
@@ -8,12 +12,10 @@ var
 
     blockIntLine: bool
     isIntLineUp: bool
-
+    tileFetcher = TileFetcher()
 
 proc nextLine(): void =
     inc LY
-    LX = 0
-    dots = 0
 
     if LY == LYC:
         COINCIDENCE.LCDS = true
@@ -47,8 +49,18 @@ proc tick*(): void =
     of OAMSEARCH:
         if dots == 80:
             switchMode(PIXELTRANSFER)
+            LX = 0
+            tileFetcher.reset()
 
     of PIXELTRANSFER:
+        tileFetcher.tick()
+
+        if not tileFetcher.shouldShift:
+            return
+
+        let color = if getLCDC(BGANDWINEN): tileFetcher.FIFO.popFirst(
+                ) else: selectColor(BGP.bitsliced(0..1))
+        drawPixel(color)
         inc LX
 
         if LX == 160:
@@ -57,15 +69,19 @@ proc tick*(): void =
     of HBLANK:
         if dots == 456:
             nextLine()
+            dots = 0
 
             if LY == 144:
+                renderFrame()
                 switchMode(VBLANK)
             else:
-                switchMode(HBLANK)
+                switchMode(OAMSEARCH)
 
     of VBLANK:
         if dots == 456:
+            dots = 0
             nextLine()
+            sendIntReq(INTVBLANK)
 
             if LY == 154:
                 inc frames

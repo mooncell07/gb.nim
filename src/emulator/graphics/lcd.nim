@@ -14,7 +14,6 @@ var
 
     pixelFmt: ptr PixelFormat
 
-
 proc init*(scale: int = 3): void =
     window = createWindow(
             "gb.nim", SDL_WINDOWPOS_CENTERED,

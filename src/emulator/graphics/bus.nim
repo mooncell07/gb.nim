@@ -2,7 +2,6 @@ var
     vram*: array[0x2000, uint8]
     oam*: array[0x100, uint8]
 
-
 proc readByte*(address: uint16, obj: bool = false): uint8 =
     if obj:
         return oam[address - 0xFE00]
