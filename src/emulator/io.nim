@@ -33,6 +33,10 @@ var
     WY*: uint8
     WX*: uint8
 
+    # PPU Internal Registers
+    LX*: uint8
+    WLY*: uint8
+
     booting*: bool = true
 
 # LUT to avoid condition chaining :/

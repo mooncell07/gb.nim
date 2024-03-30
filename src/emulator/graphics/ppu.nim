@@ -1,29 +1,45 @@
-import ../[io, types]
+import ../[io, types, utils]
 import fetcher
-import deques
 import lcd
+
 import bitops
+import deques
+import sdl2
 
 var
     state: PPUStateType
     dots: int
     frames: int
-    LX: uint8
 
     blockIntLine: bool
     isIntLineUp: bool
-    tileFetcher = TileFetcher()
+    tFetcher = TileFetcher()
+    incrWLY: bool
+    windowInit: bool = true
+
+proc isWindowEnabled*(flag: var bool): bool =
+    flag = getLCDC(WINEN) and (LY >= WY) and (LX >= (WX - 7)) and WY.isboundto(
+            0, 143) and (WX-7).isboundto(0, 159)
+    return flag
+
+proc getColor*(): Color =
+    if getLCDC(BGANDWINEN): tFetcher.FIFO.popFirst() else: selectColor(
+            BGP.bitsliced(0..1))
 
 proc nextLine(): void =
     inc LY
 
+    if incrWLY:
+        inc WLY
+
     if LY == LYC:
         COINCIDENCE.LCDS = true
-        blockIntLine = true
+        if getLCDS(LYCINT):
+            blockIntLine = true
     else:
         COINCIDENCE.LCDS = false
 
-proc executeInterrutps(): void =
+proc executeInterrupts(): void =
     if getLCDS(MODE2INT) and (state == OAMSEARCH):
         blockIntLine = true
 
@@ -41,27 +57,34 @@ proc switchMode(t: PPUStateType): void =
     setMode(t)
 
 proc tick*(): void =
+    if not getLCDC(LCDPPUEN):
+        return
     inc dots
+
     isIntLineUp = blockIntLine
     blockIntLine = false
 
     case state
     of OAMSEARCH:
         if dots == 80:
-            switchMode(PIXELTRANSFER)
             LX = 0
-            tileFetcher.reset()
+            tFetcher.fetchBackground()
+            switchMode(PIXELTRANSFER)
 
     of PIXELTRANSFER:
-        tileFetcher.tick()
+        if isWindowEnabled(tFetcher.isWindowVisible):
+            incrWLY = true
 
-        if not tileFetcher.shouldShift:
-            return
+            if windowInit:
+                tFetcher.fetchWindow()
+                windowInit = false
+                return
 
-        let color = if getLCDC(BGANDWINEN): tileFetcher.FIFO.popFirst(
-                ) else: selectColor(BGP.bitsliced(0..1))
-        drawPixel(color)
-        inc LX
+        tFetcher.tick()
+
+        if tFetcher.FIFO.len() >= 8:
+            drawPixel(getColor())
+            inc LX
 
         if LX == 160:
             switchMode(HBLANK)
@@ -70,6 +93,8 @@ proc tick*(): void =
         if dots == 456:
             nextLine()
             dots = 0
+            windowInit = true
+            incrWLY = false
 
             if LY == 144:
                 renderFrame()
@@ -86,6 +111,7 @@ proc tick*(): void =
             if LY == 154:
                 inc frames
                 LY = 0
+                WLY = 0
                 switchMode(OAMSEARCH)
 
-    executeInterrutps()
+    executeInterrupts()
