@@ -27,7 +27,7 @@ var
     dma* = DMA()
 
 
-template cycle(incr: bool = true): void =
+proc cycle(incr: bool = true): void =
     if not incr:
         return
 
@@ -41,6 +41,7 @@ template cycle(incr: bool = true): void =
             dma.initialDelay -= 1
 
         else:
+            dma.starting = false
             dma.active = true
 
 proc readByte*(address: uint16, incr = true, conflict = true): uint8 =
@@ -134,6 +135,5 @@ proc tick(d: DMA): void =
 
     if d.currentIndex == 0xA0:
         d.active = false
-        d.starting = false
         d.initialDelay = 0
         d.currentIndex = 0
