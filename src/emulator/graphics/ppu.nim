@@ -16,10 +16,14 @@ var
     tFetcher = TileFetcher()
     incrWLY: bool
     windowInit: bool = true
+    windowTrigger: bool
 
 proc isWindowEnabled*(flag: var bool): bool =
-    flag = getLCDC(WINEN) and (LY >= WY) and (LX >= (WX - 7)) and WY.isboundto(
-            0, 143) and (WX-7).isboundto(0, 159)
+    if (LY == WY):
+        windowTrigger = true
+
+    flag = getLCDC(WINEN) and windowTrigger and (LX >= (WX - 7)) and WY.isboundto(
+                0, 143) and (WX-7).isboundto(0, 159)
     return flag
 
 proc getColor*(): Color =
@@ -112,6 +116,7 @@ proc tick*(): void =
                 inc frames
                 LY = 0
                 WLY = 0
+                windowTrigger = false
                 switchMode(OAMSEARCH)
 
     executeInterrupts()
