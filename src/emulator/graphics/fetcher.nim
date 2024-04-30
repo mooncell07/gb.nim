@@ -39,7 +39,7 @@ proc internalY(f: TileFetcher): uint16 =
         return (((LY + SCY) and 0xFF).float / 8.0).uint16 * 32
     return (WLY.float / 8.0).uint16 * 32
 
-proc selectColor*(code: u2): Color =
+proc selectColor*(code: uint2): Color =
     let index = code.int * 2
     return DEFAULT_PALETTE[BGP.bitsliced(index..(index+1))]
 
