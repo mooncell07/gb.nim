@@ -1,6 +1,5 @@
 import ../[io, types, utils]
 import bus
-
 import deques
 import bitops
 import sdl2
@@ -47,8 +46,7 @@ proc selectColor*(code: u2): Color =
 proc loadPixelRow(f: TileFetcher, lo, hi: uint8): void =
     var revX: int
     for x in countdown(7, 0):
-        f.tileRowBuffer[revX] = selectColor((hi.testBit(x).uint8 shl 1) or
-                lo.testBit(x).uint8)
+        f.tileRowBuffer[revX] = selectColor((hi.testBit(x).uint8 shl 1) or lo.testBit(x).uint8)
         inc revX
 
 proc tick*(f: TileFetcher): void =

@@ -1,5 +1,4 @@
 import bitops
-
 import utils
 import types
 
@@ -21,7 +20,6 @@ var
     # PPU Registers
     LCDC*: uint8
     STAT*: uint8
-
     SCY*: uint8
     SCX*: uint8
     LY*: uint8
@@ -39,7 +37,6 @@ var
 
     booting*: bool = true
 
-# LUT to avoid condition chaining :/
 var
     serialRegTable: array[2, ptr uint8] = [addr SB, addr SC]
     timerRegTable: array[3, ptr uint8] = [addr TIMA, addr TMA, addr TAC]
@@ -77,13 +74,15 @@ proc setIoReg*(address: int, data: uint8): void =
     elif address == 0x50:
         booting = false
 
+proc getLCDC*(lct: LCDCType): bool = return LCDC.testBit(lct.ord)
+proc getLCDS*(lst: LCDSType): bool = return STAT.testBit(lst.ord)
+
 proc sendIntReq*(ISR: IntType): void =
     setBit(IF, ISR.ord)
 
-proc getLCDC*(lct: LCDCType): bool = return LCDC.testBit(lct.ord)
-proc getLCDS*(lst: LCDSType): bool = return STAT.testBit(lst.ord)
 proc `LCDS=`*(lst: LCDSType, value: bool): void = 
-    if value: STAT.setBit(lst.ord) else: STAT.clearBit(lst.ord)
+    if value: STAT.setBit(lst.ord) 
+    else: STAT.clearBit(lst.ord)
 
 proc setMode*(mode: PPUStateType): void =
     STAT.clearBits(0, 1)

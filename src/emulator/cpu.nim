@@ -1,7 +1,6 @@
 import bitops
 import os
 import strutils
-
 import registers
 import utils
 import types
@@ -13,7 +12,6 @@ var
 
     IME*: bool = false
     IMERising*: bool = false
-
 
 template debugUtil*(): void =
     if readByte(0xFF02, incr = false) == 0x81'u8:

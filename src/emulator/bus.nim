@@ -14,7 +14,6 @@ type
 
 proc tick(d: DMA): void
 
-
 var
     rom*: ROM
     wram: array[0x2000, uint8]
@@ -25,7 +24,6 @@ var
     mockExternalRam: array[0x2000, uint8]
 
     dma* = DMA()
-
 
 proc cycle(incr: bool = true): void =
     if not incr:
@@ -39,7 +37,6 @@ proc cycle(incr: bool = true): void =
     if dma.starting:
         if dma.initialDelay > 1:
             dma.initialDelay -= 1
-
         else:
             dma.starting = false
             dma.active = true
@@ -50,7 +47,6 @@ proc readByte*(address: uint16, incr = true, conflict = true): uint8 =
         return
 
     if address.isboundto(0, 0x7FFF):
-
         if booting and address.isboundto(0, 0xFF):
             result = bootRom[address].uint8
         else:
@@ -127,9 +123,7 @@ proc internal*(): void =
 
 proc tick(d: DMA): void =
     let address = io.DMA.uint16 shl 8
-    d.currentByte = readByte(address + d.currentIndex, incr = false,
-            conflict = false)
-
+    d.currentByte = readByte(address + d.currentIndex, incr = false, conflict = false)
     bus.writeByte(0xFE00 + d.currentIndex.uint16, d.currentByte, obj = true)
     inc d.currentIndex
 

@@ -16,7 +16,6 @@ type
 
     RomError* = object of ValueError
 
-
 proc read*(self: ROM, address: uint16): uint8 =
     return self.data[address].uint8
 

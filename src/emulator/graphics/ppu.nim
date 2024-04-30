@@ -1,7 +1,6 @@
 import ../[io, types, utils]
 import fetcher
 import lcd
-
 import bitops
 import deques
 import sdl2
@@ -22,17 +21,15 @@ proc isWindowEnabled*(flag: var bool): bool =
     if (LY == WY):
         windowTrigger = true
 
-    flag = getLCDC(WINEN) and windowTrigger and (LX >= (WX - 7)) and WY.isboundto(
-                0, 143) and (WX-7).isboundto(0, 159)
+    flag = getLCDC(WINEN) and windowTrigger and (LX >= (WX - 7)) and WY.isboundto(0, 143) and (WX-7).isboundto(0, 159)
     return flag
 
 proc getColor*(): Color =
-    if getLCDC(BGANDWINEN): tFetcher.FIFO.popFirst() else: selectColor(
-            BGP.bitsliced(0..1))
+    if getLCDC(BGANDWINEN): tFetcher.FIFO.popFirst() 
+    else: selectColor(BGP.bitsliced(0..1))
 
 proc nextLine(): void =
     inc LY
-
     if incrWLY:
         inc WLY
 
@@ -63,8 +60,8 @@ proc switchMode(t: PPUStateType): void =
 proc tick*(): void =
     if not getLCDC(LCDPPUEN):
         return
-    inc dots
 
+    inc dots
     isIntLineUp = blockIntLine
     blockIntLine = false
 
@@ -78,7 +75,6 @@ proc tick*(): void =
     of PIXELTRANSFER:
         if isWindowEnabled(tFetcher.isWindowVisible):
             incrWLY = true
-
             if windowInit:
                 tFetcher.fetchWindow()
                 windowInit = false
