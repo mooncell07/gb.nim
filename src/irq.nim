@@ -3,10 +3,6 @@ import bitops
 
 var IVT: array[IntType, uint16] = [0x40'u16, 0x48'u16, 0x50'u16, 0x58'u16, 0x60'u16]
 
-proc haltCheck(): void {.inline.} =
-    if halted:
-        halted = false
-
 proc serviceIRQ(intT: IntType): void {.inline.} =
     halted = false
     IME = false
@@ -23,8 +19,7 @@ proc checkPendingIRQs*(): void =
     if io.IF == 0:
         return
 
-    # Resume execution in case HALT is sent without IME
-    haltCheck()
+    halted = false
 
     if IME:
         handlePendingIRQs()
