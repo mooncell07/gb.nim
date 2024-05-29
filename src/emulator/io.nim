@@ -1,6 +1,7 @@
 import bitops
 import utils
 import types
+import joypad
 
 var
     # Serial Data Buffer
@@ -45,8 +46,16 @@ var
             addr OBP1,
             addr WY, addr WX]
 
+proc sendIntReq*(ISR: IntType): void =
+    setBit(IF, ISR.ord)
+
 proc getIoReg*(address: int): uint8 =
-    if address.isboundto(0x01, 0x02):
+    if address == 0x0:
+        let p1State = getP1State()
+        if p1State[1]: sendIntReq(INTJOYPAD)
+        result = p1State[0]
+
+    elif address.isboundto(0x01, 0x02):
         result = serialRegTable[address - 1][]
 
     elif address == 0x0F: result = IF
@@ -59,6 +68,9 @@ proc getIoReg*(address: int): uint8 =
         result = ppuRegTable[address and 0xF][]
 
 proc setIoReg*(address: int, data: uint8): void =
+    if address == 0x0:
+        P1 = data
+
     if address.isboundto(0x01, 0x02):
         serialRegTable[address - 1][] = data
 
@@ -77,8 +89,6 @@ proc setIoReg*(address: int, data: uint8): void =
 proc getLCDC*(lct: LCDCType): bool = return LCDC.testBit(lct.ord)
 proc getLCDS*(lst: LCDSType): bool = return STAT.testBit(lst.ord)
 
-proc sendIntReq*(ISR: IntType): void =
-    setBit(IF, ISR.ord)
 
 proc `LCDS=`*(lst: LCDSType, value: bool): void = 
     if value: STAT.setBit(lst.ord) 

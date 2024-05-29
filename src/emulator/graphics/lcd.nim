@@ -1,4 +1,5 @@
 import sdl2
+import ../joypad 
 
 const
     WIDTH = 160
@@ -13,6 +14,24 @@ var
     index: int
 
     pixelFmt: ptr PixelFormat
+    event = defaultEvent
+
+proc destroy*(): void =
+    renderer.destroy()
+    texture.destroy()
+    pixelFmt.destroy()
+    window.destroy()
+
+proc handleInput*(): void =
+    while pollEvent(event):
+        if event.kind == KeyDown:
+            setKey(event.key.keysym.sym)
+        elif event.kind == KeyUp:
+            unsetKey(event.key.keysym.sym)
+        elif event.kind == QuitEvent:
+            destroy()
+            quit(0)
+        else: break
 
 proc init*(scale: int = 3): void =
     window = createWindow(
@@ -37,9 +56,4 @@ proc renderFrame*(): void =
     texture.updateTexture(nil, addr buffer, (WIDTH * 4).cint)
     renderer.copy(texture, nil, nil)
     renderer.present()
-
-proc destroy*(): void =
-    renderer.destroy()
-    texture.destroy()
-    pixelFmt.destroy()
-    window.destroy()
+    handleInput()
