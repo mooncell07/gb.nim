@@ -1,4 +1,7 @@
 import utils
+import logging
+import strutils
+import strformat
 
 type
     ROM* = ref object
@@ -20,7 +23,11 @@ proc read*(self: ROM, address: uint16): uint8 =
     return self.data[address].uint8
 
 proc write*(self: ROM, address: uint16, data: uint8): void =
-    echo "CART. WRITE is not supported"
+    let
+        addressString = address.toHex()
+        dataString = data.toHex()
+
+    logger.log(lvlDebug, fmt"CART. WRITE IS NOT SUPPORTED. (address: ${addressString} data: ${dataString})")
 
 proc fillHeaders(self: ROM): void =
     self.title = self.data[0x0134..0x0143]

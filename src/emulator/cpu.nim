@@ -5,6 +5,8 @@ import registers
 import utils
 import types
 import bus
+import logging
+import strformat
 
 var
     opcode*: uint8 = 0x00
@@ -13,7 +15,7 @@ var
     IME*: bool = false
     IMERising*: bool = false
 
-template debugUtil*(): void =
+proc debugUtil*(): void =
     if readByte(0xFF02, incr = false) == 0x81'u8:
         write(stdout, readByte(0xFF01, incr = false).char)
         writeByte(0xFF02, 0, incr = false)
@@ -468,7 +470,7 @@ proc tick*(): void =
             of 0x0: opJP(fetchWord())
             of 0x6: IME = false
             of 0x7: IMERising = true
-            else: quit("INVALID OPCODE: " & opcode.toHex)
+            else: logger.log(lvlError, fmt"INVALID OPCODE: {opcode.toHex}"); quit(0)
         of 0x4:
             let nn = fetchWord()
             if getCC(CCType(opcode.y)): opCALL(nn)
@@ -476,6 +478,6 @@ proc tick*(): void =
             if not opcode.q: opPUSH(group2adjust(opcode.p))
             else:
                 if opcode.p == 0: opCALL(fetchWord())
-                else: quit("INVALID OPCODE: " & opcode.toHex)
+                else: logger.log(lvlError, fmt"INVALID OPCODE: {opcode.toHex}"); quit(0)
         of 0x6: alu(AluOp(opcode.y), fetch())
         of 0x7: opCALL(opcode.y * 8)

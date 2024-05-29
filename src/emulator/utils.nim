@@ -1,9 +1,12 @@
 import bitops
 import types
+import logging
 
 type
     uint2* = range[0'u8..3'u8]
     uint3* = range[0'u8..7'u8]
+
+var logger* = newConsoleLogger(fmtStr="[$time] - $levelname: ")
 
 func lsb*(value: uint16): uint8 {.inline.} = (value and 0xFF).uint8
 func msb*(value: uint16): uint8 {.inline.} = (value shr 8).uint8
