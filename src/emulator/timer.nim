@@ -10,7 +10,6 @@ proc getANDResult(): bool = testBit(DIV, CLKSEL[TAC.bitsliced(0..1)]) and TAC.te
 var 
     lateANDResult = getANDResult()
     cooldownCycles = 4
-    lasT = 1
     reload = false
     isTimaUpdated: bool = false
 
@@ -25,13 +24,8 @@ proc toggleCooldown(): void =
         TIMA = TMA
         sendIntReq(INTTIMER)
 
-    if lasT != 0:
-        lasT -= 1
-        return
-
     reload = false
     isTimaUpdated = false
-    lasT = 1
     cooldownCycles = 4
 
 proc tick(): void =

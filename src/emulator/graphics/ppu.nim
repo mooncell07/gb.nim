@@ -15,8 +15,6 @@ var
     dots: int
     frames: int
 
-    blockIntLine: bool
-    isIntLineUp: bool
     fetcher = Fetcher()
     incrWLY: bool
     windowInit: bool = true
@@ -52,43 +50,34 @@ proc getTileColor*(colorCode: uint8): Color =
     if getLCDC(BGANDWINEN): return searchColor(colorCode)
     else: return searchColor(BGP.bitsliced(0..1))
 
+proc checkStatInt(v: uint8): bool =
+    return STAT.testBit(v)
+
 proc nextLine(): void =
     inc LY
     if incrWLY:
         inc WLY
 
     if LY == LYC:
-        COINCIDENCE.LCDS = true
-        if getLCDS(LYCINT):
-            blockIntLine = true
+        STAT.setBit(2)
+        if checkStatInt(6):
+            sendIntReq(INTSTAT)
     else:
-        COINCIDENCE.LCDS = false
-
-proc executeInterrupts(): void =
-    if getLCDS(MODE2INT) and (state == OAMSEARCH):
-        blockIntLine = true
-
-    elif getLCDS(MODE1INT) and (state == VBLANK):
-        blockIntLine = true
-
-    elif getLCDS(MODE0INT) and (state == HBLANK):
-        blockIntLine = true
-
-    if (not isIntLineUp) and blockIntLine:
-        sendIntReq(INTSTAT)
+        STAT.clearBit(2)
 
 proc switchMode(t: PPUStateType): void =
+    STAT.clearBits(0,1)
+    STAT = STAT or t.ord.uint8
     state = t
-    setMode(t)
+    if state != PIXELTRANSFER and checkStatInt((t.ord + 3).uint8):
+        sendIntReq(INTSTAT)
 
 proc tick*(): void =
     if not getLCDC(LCDPPUEN):
-        setMode(HBLANK)
+        switchMode(HBLANK)
         return
 
     inc dots
-    isIntLineUp = blockIntLine
-    blockIntLine = false
 
     case state
     of OAMSEARCH:
@@ -119,13 +108,12 @@ proc tick*(): void =
                 return
 
         if (fetcher.tFIFO.len() > 0) and not fetcher.tickingSprite:
-
+            let tilePixel = fetcher.tFIFO.popFirst()
             if dropPixels > 0:
                 dropPixels -= 1
                 return
 
-            var 
-                tilePixel = fetcher.tFIFO.popFirst()
+            var
                 tilePixelColorIndex = getColorIndex(tilePixel.colorCode)
                 tilePixelColor = getTileColor(tilePixelColorIndex)
 
@@ -164,10 +152,12 @@ proc tick*(): void =
             incrWLY = false
             fetcher.firstInstance = true
             fetcher.sprites = @[]
+            fetcher.sFIFO.clear()
 
-            if LY == 144:
+            if LY >= 144:
                 renderFrame()
                 switchMode(VBLANK)
+                sendIntReq(INTVBLANK)
             else:
                 switchMode(OAMSEARCH)
 
@@ -175,7 +165,6 @@ proc tick*(): void =
         if dots == 456:
             dots = 0
             nextLine()
-            sendIntReq(INTVBLANK)
 
             if LY == 154:
                 inc frames
@@ -183,5 +172,3 @@ proc tick*(): void =
                 WLY = 0
                 windowTrigger = false
                 switchMode(OAMSEARCH)
-
-    executeInterrupts()
