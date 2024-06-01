@@ -174,4 +174,6 @@ proc fetchBackground*(f: Fetcher): void =
     f.fetch((SCX.float / 8.0).uint16 and 0x1F)
 
 proc fetchWindow*(f: Fetcher): void =
-    f.fetch((((LX - (WX - 7))).float / 8.0).uint16 and 0x1F)
+    var saturatedWX = WX - 7
+    if WX <= 6: saturatedWX = 0
+    f.fetch((((LX - saturatedWX)).float / 8.0).uint16 and 0x1F)

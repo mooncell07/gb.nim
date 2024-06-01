@@ -43,7 +43,10 @@ proc isWindowEnabled*(flag: var bool): bool =
     if (LY == WY):
         windowTrigger = true
 
-    flag = getLCDC(WINEN) and windowTrigger and (LX >= (WX - 7)) and WY.isboundto(0, 143) and (WX-7).isboundto(0, 159)
+    var saturatedWX = WX - 7
+    if WX <= 6: saturatedWX = 0
+
+    flag = getLCDC(WINEN) and windowTrigger and (LX >= saturatedWX) and WY.isboundto(0, 143) and saturatedWX.isboundto(0, 159)
     return flag
 
 proc getTileColor*(colorCode: uint8): Color =
