@@ -1,4 +1,5 @@
 import io
+import mmu
 import cartridge
 import utils
 import timer
@@ -16,13 +17,6 @@ proc tick(d: DMA): void
 
 var
     rom*: ROM
-    wram: array[0x2000, uint8]
-    hram: array[0x80, uint8]
-    bootRom*: string
-
-    # TODO: add support for external ram
-    mockExternalRam: array[0x2000, uint8]
-
     dma* = DMA()
 
 proc cycle(incr: bool = true): void =
@@ -46,7 +40,7 @@ proc readByte*(address: uint16, incr = true, conflict = true): uint8 =
         result = wram[(address - 0xFE00) + 0x1E00]
         return
 
-    if address.isboundto(0, 0x7FFF):
+    if address.isboundto(0, 0x7FFF) or address.isboundto(0xA000, 0xBFFF):
         if booting and address.isboundto(0, 0xFF):
             result = bootRom[address].uint8
         else:
@@ -54,9 +48,6 @@ proc readByte*(address: uint16, incr = true, conflict = true): uint8 =
 
     elif address.isboundto(0x8000, 0x9FFF):
         result = bus.readByte(address)
-
-    elif address.isboundto(0xA000, 0xBFFF):
-        result = mockExternalRam[address - 0xA000]
 
     elif address.isboundto(0xC000, 0xDFFF):
         result = wram[address - 0xC000]
@@ -82,14 +73,11 @@ proc readByte*(address: uint16, incr = true, conflict = true): uint8 =
     cycle(incr)
 
 proc writeByte*(address: uint16, data: uint8, incr = true): void =
-    if address.isboundto(0, 0x7FFF):
+    if address.isboundto(0, 0x7FFF) or address.isboundto(0xA000, 0xBFFF):
         rom.write(address, data)
 
     elif address.isboundto(0x8000, 0x9FFF):
         bus.writeByte(address, data)
-
-    elif address.isboundto(0xA000, 0xBFFF):
-        mockExternalRam[address - 0xA000] = data
 
     elif address.isboundto(0xC000, 0xDFFF):
         wram[address - 0xC000] = data
