@@ -1,5 +1,10 @@
 import utils
 import mmu
+import logging
+import strformat
+import tables
+import strutils
+import headers
 
 type
     ROM* = ref object
@@ -8,7 +13,7 @@ type
         # Headers...
         title: string
         licensee: string
-        romType: uint8
+        romType: string
         romSize: int
         romVer: uint8
         destinationCode: uint8
@@ -23,11 +28,12 @@ proc write*(self: ROM, address: uint16, data: uint8): void =
     self.mapper.intercept(address, data)
 
 proc fillHeaders(self: ROM): void =
-    self.title = romData[0x0134..0x0143]
-    self.title[0xF] = '\0'
-    self.licensee = romData[0x0144..0x0145]
+    self.title = romData[0x0134..0x0143].strip(trailing=true)
+    let lCode = romData[0x014B].int
+    self.licensee = if lCode == 0x33: NEWLICENSEECODES[romData[
+            0x0144..0x0145]] else: OLDLICENSEECODES[lCode]
 
-    self.romType = romData[0x0147].uint8
+    self.romType = CARTTYPE[romData[0x0147].int]
     self.romSize = 32 shl romData[0x0148].int
     romBankCount = uint8(self.romSize / 16)
     ramSizeCode = romData[0x0149].uint8
@@ -50,8 +56,12 @@ proc runChecksum(self: ROM): void =
 proc newRom*(filepath: string): ROM =
     let self = ROM(mapper: MBC1(romBank: 1, ramBank: 1, modeFlag: false))
     romData = readFile(filepath)
+
     self.runChecksum()
     self.fillHeaders()
     buildExternalMemory()
+
+    let cartInfoString = &"TITLE: {self.title}\nPUBLISHER: {self.licensee}\nCARTRIDGE TYPE: {self.romType}\nROM SIZE: {self.romSize}KB ({romBankCount} banks)\nCHECKSUM: {self.checksum}"
+    logger.log(lvlInfo, fmt"CARTRIDGE LOADED ✔" & "\n" & cartInfoString)
 
     return self
