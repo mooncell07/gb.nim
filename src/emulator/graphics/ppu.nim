@@ -13,7 +13,6 @@ import strformat
 var
     state: PPUStateType
     dots: int
-    frames: int
 
     fetcher = Fetcher()
     incrWLY: bool
@@ -21,12 +20,14 @@ var
     windowTrigger: bool
     dropPixels: uint8
 
+    intLineUp: bool
+
 proc searchSprites*(): void =
     for i in 0..40:
         if len(fetcher.sprites) == 10:
             break
 
-        let 
+        let
             spriteY = oam[i * 4]
             spriteX = oam[i * 4 + 1]
             tileNum = oam[i * 4 + 2]
@@ -34,8 +35,10 @@ proc searchSprites*(): void =
 
             spriteHeight: uint8 = if getLCDC(OBJSIZE): 16 else: 8
 
-        if ((LY + 16) >= spriteY) and ((LY + 16) < (spriteY + spriteHeight)) and (spriteX > 0):
-            fetcher.sprites.add(Sprite(x: spriteX, y: spriteY, tileNum: tileNum, flags: flags, height: spriteHeight))
+        if ((LY + 16) >= spriteY) and ((LY + 16) < (spriteY + spriteHeight)) and
+                (spriteX > 0):
+            fetcher.sprites.add(Sprite(x: spriteX, y: spriteY, tileNum: tileNum,
+                    flags: flags, height: spriteHeight))
 
     sort(fetcher.sprites, (a, b: Sprite) => cmp(a.x, b.x), SortOrder.Ascending)
 
@@ -46,7 +49,8 @@ proc isWindowEnabled*(flag: var bool): bool =
     var saturatedWX = WX - 7
     if WX <= 6: saturatedWX = 0
 
-    flag = getLCDC(WINEN) and windowTrigger and (LX >= saturatedWX) and WY.isboundto(0, 143) and saturatedWX.isboundto(0, 159)
+    flag = getLCDC(WINEN) and windowTrigger and (LX >= saturatedWX) and
+            WY.isboundto(0, 143) and saturatedWX.isboundto(0, 159)
     return flag
 
 proc getTileColor*(colorCode: uint8): Color =
@@ -56,28 +60,41 @@ proc getTileColor*(colorCode: uint8): Color =
 proc checkStatInt(v: uint8): bool =
     return STAT.testBit(v)
 
-proc nextLine(): void =
-    inc LY
-    if incrWLY:
-        inc WLY
+proc sendStatInt(): void =
+    let
+        oldState = intLineUp
+        intLineUp = true
 
-    if LY == LYC:
+    if not oldState and intLineUp:
+        sendIntReq(INTSTAT)
+
+proc handleCoincidence(quirk: bool = false): void =
+    var qLY = if quirk == false: LY else: 0
+
+    if qLY == LYC:
         STAT.setBit(2)
         if checkStatInt(6):
-            sendIntReq(INTSTAT)
+            sendStatInt()
     else:
         STAT.clearBit(2)
 
+proc nextLine(): void =
+    inc LY
+    if incrWLY: inc WLY
+    handleCoincidence()
+
 proc switchMode(t: PPUStateType): void =
-    STAT.clearBits(0,1)
+    STAT.clearBits(0, 1)
     STAT = STAT or t.ord.uint8
     state = t
+
     if state != PIXELTRANSFER and checkStatInt((t.ord + 3).uint8):
-        sendIntReq(INTSTAT)
+        sendStatInt()
 
 proc tick*(): void =
     if not getLCDC(LCDPPUEN):
         switchMode(HBLANK)
+        LY = 0
         return
 
     inc dots
@@ -91,7 +108,7 @@ proc tick*(): void =
             switchMode(PIXELTRANSFER)
 
     of PIXELTRANSFER:
-        if fetcher.tickingSprite: 
+        if fetcher.tickingSprite:
             fetcher.spriteTick()
         else:
             if (fetcher.sprites.len() != 0):
@@ -123,12 +140,14 @@ proc tick*(): void =
                 finalColor: Color
 
             if (fetcher.sFIFO.len() > 0):
-                var 
+                var
                     spritePixel = fetcher.sFIFO.popFirst()
-                    spritePixelColorIndex = getColorIndex(spritePixel.colorCode, true, spritePixel.palette1)
+                    spritePixelColorIndex = getColorIndex(spritePixel.colorCode,
+                            true, spritePixel.palette1)
                     spritePixelColor = searchColor(spritePixelColorIndex)
 
-                if (spritePixel.colorCode == 0) or (spritePixel.priority and (tilePixel.colorCode != 0)):
+                if (spritePixel.colorCode == 0) or (spritePixel.priority and (
+                        tilePixel.colorCode != 0)):
                     finalColor = tilePixelColor
                 else:
                     if getLCDC(OBJEN): finalColor = spritePixelColor
@@ -141,7 +160,7 @@ proc tick*(): void =
 
         if LX == 160:
             let dotsConsumed = dots - 80
-            if (dotsConsumed < 172) or (dotsConsumed > 289) :
+            if (dotsConsumed < 172) or (dotsConsumed > 289):
                 logger.log(lvlWarn, fmt"MODE 3 UNDER-/OVER-FLEW THE MIN/MAX DOT LIMIT. (Dots: {dotsConsumed})")
 
             switchMode(HBLANK)
@@ -154,10 +173,10 @@ proc tick*(): void =
             windowInit = true
             incrWLY = false
             fetcher.firstInstance = true
-            fetcher.sprites = @[]
-            fetcher.sFIFO.clear()
-
-            if LY >= 144:
+            intLineUp = false
+            fetcher.clearSpriteFetcher()
+    
+            if LY > 143:
                 renderFrame()
                 switchMode(VBLANK)
                 sendIntReq(INTVBLANK)
@@ -165,12 +184,15 @@ proc tick*(): void =
                 switchMode(OAMSEARCH)
 
     of VBLANK:
-        if dots == 456:
+
+        if (LY == 153) and (dots == 4):
+            handleCoincidence(quirk = true)
+
+        if dots > 456:
             dots = 0
             nextLine()
 
-            if LY == 154:
-                inc frames
+            if LY > 153:
                 LY = 0
                 WLY = 0
                 windowTrigger = false

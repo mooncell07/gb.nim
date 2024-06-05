@@ -48,6 +48,8 @@ type
         firstInstance*: bool
         tickingSprite*: bool
 
+        staticLine*: uint8
+
 proc getTileDataOffset(tileNum: uint8): uint16 =
     if getLCDC(BGANDWINTILEDATAAREA):
         return getTileDataBase() + (uint16(tileNum) * 16)
@@ -55,7 +57,7 @@ proc getTileDataOffset(tileNum: uint8): uint16 =
 
 proc getTileRow(f: Fetcher): uint16 =
     if not f.isWindowVisible:
-        return (((LY + SCY) mod 8).uint16 * 2)
+        return ((f.staticLine mod 8).uint16 * 2)
     return (WLY mod 8).uint16 * 2
 
 proc internalY(f: Fetcher): uint16 =
@@ -92,6 +94,7 @@ proc tick*(f: Fetcher): void =
         f.state = 1
     
     of 1:
+        f.staticLine = LY + SCY
         f.tileNum = readByte(getTileMapBase(win = f.isWindowVisible) + ((
                     f.internalX + f.internalY()) and 0x3FF))
         f.state = 2
@@ -177,3 +180,7 @@ proc fetchWindow*(f: Fetcher): void =
     var saturatedWX = WX - 7
     if WX <= 6: saturatedWX = 0
     f.fetch((((LX - saturatedWX)).float / 8.0).uint16 and 0x1F)
+
+proc clearSpriteFetcher*(f: Fetcher): void =
+    f.sprites = @[]
+    f.sFIFO.clear()
