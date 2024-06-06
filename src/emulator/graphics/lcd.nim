@@ -42,7 +42,7 @@ proc init*(scale: int = 3): void =
             SDL_WINDOW_SHOWN
         )
 
-    renderer = createRenderer(window, -1, 1)
+    renderer = createRenderer(window, -1, Renderer_PresentVsync)
     texture = createTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
             SDL_TEXTUREACCESS_STREAMING, WIDTH.cint, HEIGHT.cint)
     pixelFmt = allocFormat(window.getPixelFormat())
