@@ -7,10 +7,10 @@ import algorithm
 import logging
 import strformat
 
-const DEFAULT_PALETTE = [sdl2.color(0xE0, 0xF8, 0xD0, 0xFF), #00 - WHITE
-                        sdl2.color(0x88, 0xC0, 0x70, 0xFF), #01 - LIGHT GRAY
-                        sdl2.color(0x34, 0x68, 0x56, 0xFF), #10 - DARK GRAY
-                        sdl2.color(0x8, 0x18, 0x20, 0xFF)] #11 - BLACK
+const DEFAULT_PALETTE = [sdl2.color(0xFF, 0xF6, 0xD3, 0xFF), #00 - WHITE
+                        sdl2.color(0xF9, 0xA8, 0x75, 0xFF), #01 - LIGHT GRAY
+                        sdl2.color(0xEB, 0x6B, 0x6F, 0xFF), #10 - DARK GRAY
+                        sdl2.color(0x7C, 0x3F, 0x58, 0xFF)] #11 - BLACK
 
 type
     Sprite* = ref object
