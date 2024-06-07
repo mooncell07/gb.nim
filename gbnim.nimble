@@ -5,8 +5,8 @@ author        = "mooncell07"
 description   = "A Nintendo Game Boy Emulator."
 license       = "MIT"
 srcDir        = "src"
-bin           = @["bin/main"]
-
+bin           = @["main"]
+binDir        = "bin"
 
 # Dependencies
 

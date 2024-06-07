@@ -1,4 +1,4 @@
-import emulator/[bus, cartridge, timer, mmu]
+import emulator/[bus, cartridge, timer]
 import emulator/graphics/[lcd]
 import os
 
@@ -9,7 +9,6 @@ proc init(): void =
 
     if args.len > 0:
         bus.rom = newRom(args[0])
-        bootRom = readFile("roms/bootrom.gb")
 
     lcd.init()
 
@@ -21,6 +20,5 @@ proc step(): void =
 
 when isMainModule:
     init()
-
     while true:
         step()

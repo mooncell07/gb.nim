@@ -1,10 +1,11 @@
 import bitops
 import utils
 
-const RAMBANKS = [0, 1, 2, 4, 16, 8]
+const 
+    RAMBANKS = [0, 1, 2, 4, 16, 8]
+    bootRom*: string = staticRead("../../roms/bootrom.gb")
 
 var
-    bootRom*: string
     romData*: string
     extRam*: seq[uint8]
     wram*: array[0x2000, uint8]
