@@ -1,8 +1,2 @@
-nimcache/
-nimblecache/
-htmldocs/
-
+build/
 tests/
-bin/
-logs.txt
-test.nim
