@@ -508,15 +508,16 @@ void cpuTick() {
                             case 0x1:
                                 opLDr_addr(A, getReg16(DE));
                                 break;
-                            case 0x2:
-                                uint16_t d = getReg16(HL);
-                                opLDr_addr(A, d);
-                                setReg16(HL, d + 1);
+                            case 0x2:{
+                                uint16_t data = getReg16(HL);
+                                opLDr_addr(A, data);
+                                setReg16(HL, data + 1);
                                 break;
+                            }
                             case 0x3:
-                                uint16_t ata = getReg16(HL);
-                                opLDr_addr(A, ata);
-                                setReg16(HL, ata - 1);
+                                uint16_t data = getReg16(HL);
+                                opLDr_addr(A, data);
+                                setReg16(HL, data - 1);
                                 break;
                         }
                     }
