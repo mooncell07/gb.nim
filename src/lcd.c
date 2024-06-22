@@ -66,6 +66,8 @@ bool initLCD() {
     texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
                                 SDL_TEXTUREACCESS_STREAMING, WIDTH, HEIGHT);
     pixelFmt = SDL_AllocFormat(SDL_GetWindowPixelFormat(window));
+    SDL_RenderSetLogicalSize(renderer, WIDTH, HEIGHT);
+
     return true;
 }
 
