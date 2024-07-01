@@ -164,6 +164,8 @@ void spriteTick(Fetcher *f) {
             break;
         case 2:
             // Horizontal flip.
+            int counter = 0;
+            if (f->currSprite.x < 8) counter = 8 - f->currSprite.x;
             if (BT(f->currSprite.flags, 5)) flipX(f);
 
             // If the Sprite FIFO already has some residual pixels left then we
@@ -171,16 +173,16 @@ void spriteTick(Fetcher *f) {
             // using a transparency check.
             uint8_t residualAmount = FIFOLen(&sFIFO.base);
 
-            for (int i = 0; i < 8; i++) {
-                uint8_t cc = f->spriteSlice[i];
+            for (; counter < 8; counter++) {
+                uint8_t cc = f->spriteSlice[counter];
                 Pixel px = {cc, BT(f->currSprite.flags, 4),
                             BT(f->currSprite.flags, 7)};
 
-                if (residualAmount >= (i + 1)) {
-                    Pixel residualPixel = getEntryAt(sFIFO, &sFIFO, i);
+                if (residualAmount >= (counter + 1)) {
+                    Pixel residualPixel = getEntryAt(sFIFO, &sFIFO, counter);
 
                     if ((residualPixel.colorCode == 0) && cc != 0) {
-                        setEntryAt(sFIFO, i, px);
+                        setEntryAt(sFIFO, counter, px);
                     }
                 } else {
                     pushEntry(sFIFO, px);
