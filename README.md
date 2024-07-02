@@ -17,7 +17,18 @@ Currently, GB.c supports following list of components:
 - JOYPAD
 - MBC1
 
-*Currently, the MBC1 implementation doesn't support saving states.*.
+*Currently, the MBC1 implementation doesn't support saving states*.
+
+## Keyboard Mapping
+
+| Joypad Keys | Mapping     |
+|-------------|-------------|
+| A           | Z           |
+| B           | X           |
+| SELECT      | RIGHT SHIFT |
+| START       | ENTER       |
+
+*UP, DOWN, RIGHT & LEFT are mapped to corresponding ARROW KEYS on your keyboard*
 
 ## Tests & Screencaps
 
