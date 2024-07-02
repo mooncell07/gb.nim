@@ -12,29 +12,29 @@ JoypadState js = {0};
 
 void unsetKey(int key) {
     switch (key) {
-        case SDLK_e:
+        case SDLK_z:
             resetBit(0);
             break;
-        case SDLK_q:
+        case SDLK_x:
             resetBit(1);
             break;
-        case SDLK_LSHIFT:
+        case SDLK_RSHIFT:
             resetBit(2);
             break;
-        case SDLK_z:
+        case SDLK_RETURN:
             resetBit(3);
             break;
 
-        case SDLK_d:
+        case SDLK_RIGHT:
             resetBit(4);
             break;
-        case SDLK_a:
+        case SDLK_LEFT:
             resetBit(5);
             break;
-        case SDLK_w:
+        case SDLK_UP:
             resetBit(6);
             break;
-        case SDLK_s:
+        case SDLK_DOWN:
             resetBit(7);
             break;
         default:
@@ -44,29 +44,29 @@ void unsetKey(int key) {
 
 void setKey(int key) {
     switch (key) {
-        case SDLK_e:
+        case SDLK_z:
             toggleBit(0);
             break;
-        case SDLK_q:
+        case SDLK_x:
             toggleBit(1);
             break;
-        case SDLK_LSHIFT:
+        case SDLK_RSHIFT:
             toggleBit(2);
             break;
-        case SDLK_z:
+        case SDLK_RETURN:
             toggleBit(3);
             break;
 
-        case SDLK_d:
+        case SDLK_RIGHT:
             toggleBit(4);
             break;
-        case SDLK_a:
+        case SDLK_LEFT:
             toggleBit(5);
             break;
-        case SDLK_w:
+        case SDLK_UP:
             toggleBit(6);
             break;
-        case SDLK_s:
+        case SDLK_DOWN:
             toggleBit(7);
             break;
         default:
@@ -77,30 +77,22 @@ void setKey(int key) {
 void setKeyMask() {
     uint8_t controlBits = BEXTR(js.P1, 4, 5);
     js.keyMask = 0xCF;
-    switch (controlBits) {
-        case 0b00:
-            break;
-        case 0b01: {
-            uint8_t keyIndex = __builtin_ffs(BEXTR(js.keyState, 0, 3));
-            if (keyIndex > 0) {
-                uint8_t finalKeyIndex = keyIndex - 1;
-                js.fallingEdge = BT(js.keyMask, finalKeyIndex);
-                clearBit(js.keyMask, finalKeyIndex);
-            }
+    uint8_t states = 0x00;
 
+    switch (controlBits) {
+        case 0b00: {
+            states = 0xFF;
+            break;
+        }
+        case 0b01: {
+            states = BEXTR(js.keyState, 0, 3);
             break;
         }
         case 0b10: {
-            uint8_t keyIndex = __builtin_ffs(BEXTR(js.keyState, 4, 7));
-            if (keyIndex > 0) {
-                uint8_t finalKeyIndex = keyIndex - 1;
-                js.fallingEdge = BT(js.keyMask, finalKeyIndex);
-                clearBit(js.keyMask, finalKeyIndex);
-            }
+            states = BEXTR(js.keyState, 4, 7);
             break;
         }
-        case 0b11:
-            js.keyMask = 0xFF;
-            break;
     }
+    js.keyMask &= ~states;
+
 }

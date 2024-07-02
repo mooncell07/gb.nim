@@ -41,9 +41,6 @@ uint8_t getIoReg(uint8_t address) {
     switch (address) {
         case 0x00:
             setKeyMask();
-            if (js.fallingEdge) {
-                sendIntReq(INTJOYPAD);
-            }
             return js.keyMask;
 
         case 0x04:

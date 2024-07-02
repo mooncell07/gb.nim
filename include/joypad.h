@@ -6,7 +6,6 @@ typedef struct {
     uint8_t P1;
     uint8_t keyState;
     uint8_t keyMask;
-    bool fallingEdge;
 } JoypadState;
 
 extern JoypadState js;
